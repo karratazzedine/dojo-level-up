@@ -209,11 +209,16 @@ function practice() {
     <div class="choices">${shuffle(question.options).map((value,i)=>`<button><span class="choice-key" aria-hidden="true">${'ABCD'[i]}</span><span class="choice-text">${esc(value)}</span></button>`).join('')}</div>
     <details class="hint"><summary>💡 Vraag Poko om een hint</summary><p>${hints[question.topic]}</p></details>
     <button class="lesson-button" id="lesson">▶ Uitleg met Poko</button><dialog id="lesson-dialog"></dialog>
-    <div class="feedback" id="feedback" aria-live="polite"></div><button class="primary" id="next" hidden>Volgende vraag →</button>
+    <div class="feedback" id="feedback" aria-live="polite"></div><div class="answer-actions">
+      <button class="primary" id="next" hidden>Volgende vraag →</button>
+      <button class="game-button" id="play-game" hidden>⭐ Speel Sterrensprong</button>
+    </div>
+    <dialog id="game-dialog" aria-labelledby="game-title"></dialog>
   </section>
   <section class="practice-time">${goalMarkup()}</section>`;
   screen.querySelectorAll('.choices button').forEach(b=>b.onclick=()=>grade(b));
   screen.querySelector('#next').onclick=nextQuestion;
+  screen.querySelector('#play-game').onclick=playStarJump;
   screen.querySelector('#pause').onclick=()=>show('home');
   screen.querySelector('#lesson').onclick=showLesson;
 }
@@ -302,10 +307,68 @@ function grade(button) {
   screen.querySelector('#feedback').innerHTML = `<strong>${message}</strong><p>${question.explanation}</p>`;
   const next = screen.querySelector('#next');
   next.hidden = false;
+  screen.querySelector('#play-game').hidden = false;
   const canRetry = !correct && mission.steps + mission.queue.length < 6;
   next.textContent = canRetry ? 'Probeer een soortgelijke vraag →' :
     mission.queue.length ? 'Naar het volgende eiland →' : 'Bekijk je missieresultaat →';
   next.focus();
+}
+function playStarJump() {
+  const dialog = screen.querySelector('#game-dialog');
+  const playButton = screen.querySelector('#play-game');
+  const goal = 4;
+  let caught = 0;
+  let starPosition = -1;
+
+  dialog.innerHTML = `<div class="game-head">
+    <h2 id="game-title">Sterrensprong</h2>
+    <button id="close-game" aria-label="Sluit Sterrensprong">✕</button>
+  </div>
+  <p id="game-status" aria-live="polite"></p>
+  <div class="star-board">${Array.from({length:9}, (_, i) =>
+    `<button type="button" aria-label="Tegel ${i+1}"></button>`).join('')}</div>
+  <button class="primary" id="game-continue" hidden>Verder oefenen →</button>`;
+  const board = dialog.querySelector('.star-board');
+  const tiles = [...board.querySelectorAll('button')];
+  const status = dialog.querySelector('#game-status');
+  const continueButton = dialog.querySelector('#game-continue');
+  const scenery = ['🍃', '🌸', '☁️', '🎋'];
+
+  function revealStar(focusStar) {
+    const positions = tiles.map((_, index) => index).filter(index => index !== starPosition);
+    starPosition = pick(positions);
+    status.textContent = `${caught} van ${goal} sterren · Tik op de gouden ster!`;
+    for (const [index, tile] of tiles.entries()) {
+      const hasStar = index === starPosition;
+      tile.classList.toggle('has-star', hasStar);
+      tile.setAttribute('aria-label', hasStar ? 'Pak de gouden ster' : `Tegel ${index+1}`);
+      tile.textContent = hasStar ? '⭐' : scenery[index % scenery.length];
+    }
+    if (focusStar) tiles[starPosition].focus();
+  }
+
+  for (const [index, tile] of tiles.entries()) {
+    tile.onclick = () => {
+      if (index !== starPosition) return;
+      caught++;
+      if (caught < goal) {
+        revealStar(true);
+        return;
+      }
+      board.hidden = true;
+      status.textContent = '🌟 Alle vier gevangen! Poko maakt een vreugdesprong.';
+      continueButton.hidden = false;
+      continueButton.focus();
+    };
+  }
+  continueButton.onclick = () => { dialog.close(); nextQuestion(); };
+  dialog.querySelector('#close-game').onclick = () => dialog.close();
+  dialog.onclose = () => {
+    lastInput = lastTick = Date.now();
+    if (playButton.isConnected) playButton.focus();
+  };
+  revealStar(false);
+  dialog.showModal();
 }
 function monday() {
   const date = new Date(dateKey()+'T12:00:00Z');
@@ -353,7 +416,7 @@ document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>show(b.dataset
 setInterval(()=>{
   const now=Date.now(), elapsed=now-lastTick;
   lastTick=now;
-  if(view!=='practice'||document.hidden||document.querySelector('#lesson-dialog[open]')||now-lastInput>90000||elapsed>2500)return;
+  if(view!=='practice'||document.hidden||document.querySelector('.arena dialog[open]')||now-lastInput>90000||elapsed>2500)return;
   const current=day();
   current.seconds++;
   todayEarned();

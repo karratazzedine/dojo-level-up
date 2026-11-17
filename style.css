@@ -43,3 +43,54 @@ button{min-height:44px}
 @media print{body,.card{background:white;color:black}th,td{color:black}}
 .quest-goals{display:grid;gap:10px}.quest-goals>div{background:#0f242f;border:1px solid #3f606b;border-radius:12px;padding:8px 12px}.quest-goals p{margin:0;font-weight:700;font-size:.9rem}.quest-goals .meter{height:10px}.quest-goals>div:nth-child(2) .meter{accent-color:#7cddff}.reward-status{margin:10px 0 0;color:var(--accent);font-weight:800}.practice-time .quest-goals{grid-template-columns:1fr 1fr}.lesson-button{margin-top:10px;background:#244a56;border-color:#6f9fae;color:#edfaff}.arena dialog{max-width:min(590px,92vw);width:100%;max-height:85vh;background:#162d3a;color:#fff;border:1px solid #678998;border-radius:20px;padding:clamp(15px,4vw,30px);box-shadow:0 24px 75px #000a}.arena dialog::backdrop{background:#07121cdc}.lesson-top,.lesson-actions{display:flex;align-items:center;justify-content:space-between;gap:10px}.lesson-top{margin-bottom:12px}.lesson-scene{display:flex;gap:16px;align-items:center;background:linear-gradient(130deg,#163e50,#203647);border:1px solid #4d7584;border-radius:16px;padding:20px;margin:16px 0;min-height:135px;animation:lesson-in .22s ease-out}.lesson-scene>span{font-size:2.4rem}.lesson-scene p{font-weight:700;margin:4px 0 0}.lesson-scene small{color:#a4e6f8}.video{margin-top:18px;padding:12px;border:1px solid #4d7584;border-radius:12px}.video summary{cursor:pointer;font-weight:700}.video a{color:#b7eeff;font-size:.85rem}.player iframe{margin-top:10px;width:100%;aspect-ratio:16/9;border:0;border-radius:8px;background:#0b1b26}@keyframes lesson-in{from{opacity:.6;transform:translateY(4px)}to{opacity:1;transform:none}}@media(max-width:480px){.lesson-scene{padding:12px}.lesson-actions button{padding:8px 12px}}
 .world{position:relative;isolation:isolate;overflow:hidden;padding-top:20px}.world::before{content:"";position:absolute;inset:0;z-index:-1;background:repeating-linear-gradient(45deg,transparent 0 10px,#ffffff0b 10px 12px),radial-gradient(ellipse at 80% 0,#dc773063,transparent 75%)}.world:nth-child(2)::before{background:repeating-linear-gradient(135deg,transparent 0 10px,#ffffff0b 10px 12px),radial-gradient(ellipse at 80% 0,#d1af3561,transparent 75%)}.world:nth-child(3)::before{background:repeating-linear-gradient(45deg,transparent 0 10px,#ffffff0b 10px 12px),radial-gradient(ellipse at 80% 0,#499cdb6b,transparent 75%)}.world-icon{font-size:2.2rem;width:54px;height:52px}.daily{border-color:#747447;background:radial-gradient(ellipse at 100% 0,#9a78253d,transparent 75%),var(--panel)}
+
+.answer-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 12px;
+}
+.game-button {
+  background: #ffe38a;
+  border-color: #ffdb66;
+  color: #2a2117;
+}
+.game-button:hover {
+  color: #2a2117;
+  background: #fff0b4;
+}
+#game-dialog {
+  width: min(520px, 92vw);
+  background: linear-gradient(150deg, #173e50, #173541 45%, #1c443a);
+}
+.game-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.game-head h2 { color: #ffe38a; margin: 0; }
+#game-status { color: #f8f7f0; font-weight: 700; margin: 12px 0; }
+.star-board {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  border-radius: 16px;
+  padding: 10px;
+  background: #0c2530;
+}
+.star-board[hidden] { display: none; }
+.star-board button {
+  aspect-ratio: 1.45;
+  min-height: 52px;
+  padding: 0;
+  font-size: clamp(1.35rem, 5vw, 2.5rem);
+  background: #21404b;
+  border-color: #466d76;
+  touch-action: manipulation;
+}
+.star-board .has-star {
+  background: radial-gradient(circle, #926320, #674223);
+  border: 2px solid #ffe38a;
+  box-shadow: inset 0 0 12px #f7c75768;
+}
