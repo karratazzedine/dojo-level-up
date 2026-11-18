@@ -150,3 +150,33 @@ main { width:min(1120px,92vw); }
   .game-choices { grid-template-columns:1fr; }.game-choices button { display:grid; grid-template-columns:50px 1fr; min-height:80px; text-align:left; padding:12px; background-size:cover; }.game-choices button>span { grid-row:span 2; font-size:2rem; }.game-choices small { grid-column:2; }
 }
 @media(max-width:440px) { .reflection-options { grid-template-columns:1fr; }.bridge-path { gap:3px; }.bridge-stone { min-height:46px; }.game-land { padding-left:9px; padding-right:9px; } }
+
+/* Earned building rewards and personal progress */
+header { padding-left:max(3vw,calc((100vw - 1120px)/2)); padding-right:max(3vw,calc((100vw - 1120px)/2)); }
+header strong { font-size:1.3rem; }nav button { font-size:.9rem; padding:8px 10px; }
+.island-teaser { display:grid; grid-template-columns:1.1fr 1fr; align-items:center; background:linear-gradient(110deg,#213e4b,#142a37); border:1px solid #648a79; border-radius:20px; overflow:hidden; margin:20px 0; }
+.island-teaser>div { padding:24px; }.island-teaser h2 { color:#ffe29b; }.island-teaser img { width:100%; height:245px; object-fit:cover; }.island-teaser p { color:#d6e6ed; }
+.island-heading { display:flex; justify-content:space-between; gap:15px; align-items:center; margin-bottom:20px; }.island-heading h1 { font-size:clamp(40px,6vw,65px); }
+.coin-wallet { display:grid; grid-template-columns:auto 1fr; align-items:center; gap:0 9px; background:#4c3d25; border:1px solid #e4c070; padding:12px 20px; border-radius:16px; }.coin-wallet>span:first-child { grid-row:span 2; font-size:2rem; color:#ffdf80; }.coin-wallet strong { font-size:1.8rem; color:#ffeaab; line-height:1.1; }.coin-wallet>span:last-child { font-size:.8rem; white-space:nowrap; }
+.my-island { position:relative; border:1px solid #6faca2; border-radius:22px; overflow:hidden; background:#15646a; isolation:isolate; }
+.my-island>img { width:100%; display:block; }.island-name { position:absolute; left:0; right:0; bottom:0; padding:22px 18px 10px; background:linear-gradient(transparent,#0b263ce6); font-weight:800; color:#f6f8da; }
+.island-message { min-height:1.7em; margin:16px 0; color:#dcf0ba; font-weight:700; }
+.build-rules { display:flex; flex-wrap:wrap; gap:9px; }.build-rules>span { padding:10px 14px; background:#203e4b; border:1px solid #50727b; border-radius:11px; font-size:.85rem; }.build-rules strong { color:#ffdf80; margin-left:8px; }.coin-info { font-size:.85rem; margin:16px 0; }.coin-info summary { cursor:pointer; }
+.decoration-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; margin:20px 0; }
+.decoration-card { display:flex; align-items:flex-start; flex-direction:column; padding:20px; border:1px solid #507583; border-radius:17px; background:linear-gradient(140deg,#244550,#1b303e); }
+.decoration-card h2 { font-size:1.8rem; }.decoration-card p { flex:1; color:#cbdee5; font-size:.9rem; }.decoration-card small { margin-top:8px; color:#d7e5ec; }.collection-icon { display:grid; place-items:center; font-size:2.8rem; background:#ffffff0b; width:76px; height:76px; border-radius:16px; margin-bottom:12px; }
+.move-item { margin-top:8px; font-size:.85rem; }
+.coin-earned,.reflection-bonus { display:inline-block; padding:6px 11px; margin-bottom:10px; background:#58451f; color:#ffe9a8; border:1px solid #ac8c47; border-radius:8px; font-weight:800; }
+.coin-earned+strong { display:block; }
+.voxel-decor { position:absolute; width:10%; height:14%; transform:translate(-50%,-100%); filter:drop-shadow(6px 8px 3px #1b593d7a); }
+.practice-chart { display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); gap:10px; align-items:end; padding:14px 0; margin-top:18px; }.chart-day { display:flex; flex-direction:column; align-items:center; gap:6px; }.chart-day>strong { color:#d7fb70; }.chart-day>span { font-size:.76rem; color:#c4dce6; }.bar-track { height:100px; width:min(48px,100%); display:flex; align-items:flex-end; background:#0d2631; border-radius:8px; overflow:hidden; }.bar-track>div { width:100%; background:linear-gradient(#d4f896,#4fad93); border-radius:7px 7px 0 0; }
+.subject-progress { margin:20px 0; }.subject-progress p { font-size:.9rem; margin-bottom:5px; }.subject-progress small { display:block; color:#bed4de; margin-top:5px; }
+.badge-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; margin-top:15px; }.badge-grid article { background:#1a303b; padding:17px; border:1px solid #45616e; border-radius:15px; }.badge-grid article.unlocked { background:linear-gradient(130deg,#3e502c,#1c3937); border-color:#b3cc7a; }.badge-grid span { display:block; font-size:2rem; margin-bottom:8px; }.badge-grid h3 { font-size:.95rem; }.badge-grid p { font-size:.8rem; color:#ccdde2; margin:0; }
+@media(max-width:800px) { header { align-items:flex-start; flex-direction:column; }nav { gap:3px; }.island-teaser { grid-template-columns:1fr; }.island-teaser img { height:200px; object-position:50% 38%; }.decoration-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }.badge-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+@media(max-width:420px) { .island-heading { flex-direction:column; align-items:flex-start; }.coin-wallet { padding:9px 15px; }.decoration-card { padding:13px; }.decoration-card h2 { font-size:1.5rem; }.decoration-card button { padding:9px 10px; font-size:.83rem; }.build-rules { gap:6px; }.build-rules>span { padding:8px; }.practice-chart { gap:6px; } }
+
+button:disabled { cursor:default; opacity:.55; box-shadow:none; }
+.voxel-decor,.sprite-item { background-image:url('decorations.webp'); background-size:300% 200%; background-repeat:no-repeat; }
+.voxel-decor { width:17%; height:auto; aspect-ratio:1; }
+.decor-tree { background-position:0 0; }.decor-crystal { background-position:50% 0; }.decor-gate { background-position:100% 0; }.decor-lantern { background-position:0 100%; }.decor-tower { background-position:50% 100%; }.decor-dragon { background-position:100% 100%; }
+.collection-icon { width:110px; height:110px; background-color:transparent; border-radius:0; }

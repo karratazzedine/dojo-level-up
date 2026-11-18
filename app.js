@@ -58,6 +58,25 @@ const level = topic => {
   const score = recent.filter(e => e.correct).length;
   return score >= 7 ? 3 : score >= 4 ? 2 : 1;
 };
+function missionQueue() {
+  const queue=shuffle(topics);
+  if (queue.join('|') === state.lastOrder?.join('|')) queue.push(queue.shift());
+  state.lastOrder=[...queue];
+  return queue;
+}
+function questionIdentity(item) {
+  return item.word || (item.title ? item.title+'|'+item.prompt : item.prompt);
+}
+function selectQuestion(topic,rank,previous) {
+  const history=(state.questionHistory??{})[topic]??[];
+  const pool=topic===topics[0] ?
+    Array.from({length:32},()=>build(topic,rank,previous)) :
+    schoolQuestions(topic,rank,previous);
+  const unseen=pool.filter(item=>!history.includes(questionIdentity(item)));
+  if(unseen.length)return pick(unseen);
+  // When a compatible question set is exhausted, return the least recently seen.
+  return pool.reduce((oldest,item)=>history.indexOf(questionIdentity(item))<history.indexOf(questionIdentity(oldest))?item:oldest);
+}
 const spelling = [
   ['grappig','Het stripverhaal was heel ___.'],['vrolijk','Na het spelen liep Noor ___ naar huis.'],
   ['handig','Een extra potlood is altijd ___.'],['eerlijk','Sam was ___ en gaf de gevonden munt terug.'],
@@ -68,6 +87,37 @@ const spelling = [
   ['vriendelijk','De trainer begroet iedereen ___.'],['zonnig','Vandaag is het buiten lekker ___.'],
   ['eindelijk','De brug is na drie weken ___ klaar.'],['krachtig','Zij duwt ___ tegen de zware deur.']
 ].filter(([word]) => /(?:ig|lijk)$/.test(word));
+function schoolQuestions(topic,rank,previous) {
+  if(topic===topics[1]) {
+    const bank=[...spelling.map(([word,sentence])=>({kind:'ending',word,sentence})),...extraSpelling];
+    const compatible=bank.filter(item=>!previous ||
+      item.kind===previous.kind && (item.kind!=='ending' || item.word.endsWith(previous.word.endsWith('lijk')?'lijk':'ig')));
+    const different=compatible.filter(item=>item.word!==previous?.word);
+    return (different.length?different:compatible).map(item=>{
+      if(item.kind!=='ending')return {kind:item.kind,word:item.word,prompt:'Welk woord hoort op de lege plek?',passage:item.sentence,
+        answer:item.word,options:[item.word,...item.options],explanation:item.tip,skill:item.kind};
+      const ending=item.word.endsWith('lijk')?'lijk':'ig';
+      const stem=item.word.slice(0,-ending.length);
+      return {kind:'ending',word:item.word,prompt:rank===1?'Welk woord is goed gespeld?':'Welk woord hoort op de lege plek?',
+        passage:rank===1?'':item.sentence,answer:item.word,
+        options:[item.word,stem+(ending==='lijk'?'luk':'ug'),stem+(ending==='lijk'?'leik':'ich')],
+        explanation:`De vaste uitgang is -${ending}. Je hoort vaak een korte ‘uh’-klank, maar schrijft ${ending}. Kijk extra goed naar de laatste letters.`};
+    });
+  }
+  const preferredSkills=rank===1?['informatie vinden','volgorde','woordbetekenis']:
+    rank===3?['hoofdgedachte','afleiden','oorzaak en gevolg','tekstdoel','verwijswoorden']:[];
+  const bank=schoolReading.flatMap(text=>{
+    const preferred=text.questions.filter(item=>preferredSkills.includes(item[5]));
+    const questions=previous?text.questions.filter(item=>item[5]===previous.skill):
+      preferred.length?preferred:text.questions;
+    return questions.map(([prompt,answer,wrong1,wrong2,explanation,skill])=>({
+      kind:'reading',passage:text.passage,title:text.title,textType:text.type,icon:text.icon,
+      prompt,answer,options:[answer,wrong1,wrong2],explanation,skill
+    }));
+  });
+  const different=bank.filter(item=>item.passage!==previous?.passage);
+  return different.length?different:bank;
+}
 function build(topic, rank, previous) {
   if(topic === topics[0]) {
     const a = number(rank === 3 ? 200 : rank * 24, rank === 3 ? 700 : rank * 65), b = number(8,rank * 20);
@@ -115,31 +165,9 @@ function build(topic, rank, previous) {
     const sign = plus ? 1 : -1, goal = start + sign*b, tens = b - b%10;
     return math(kind,prompt,goal,`Begin bij ${start}. ${plus ? 'Tel' : 'Haal'} eerst ${tens} ${plus ? 'erbij' : 'eraf'}. Doe daarna hetzelfde met ${b%10}. Controleer of je uitkomst ${plus ? 'groter' : 'kleiner'} is dan ${start}.`,[start-sign*b,goal+10,goal-1]);
   }
-  if(topic === topics[1]) {
-    if (previous?.kind && previous.kind !== 'ending' || !previous && Math.random() < .5) {
-      const candidates = extraSpelling.filter(item => !previous || item.kind === previous.kind && item.word !== previous.word);
-      const item = pick(candidates);
-      return {kind:item.kind, word:item.word, prompt:'Welk woord hoort op de lege plek?', passage:item.sentence,
-        answer:item.word,options:[item.word,...item.options],explanation:item.tip,skill:item.kind};
-    }
-    const [word,sentence] = pick(spelling.filter(([w]) => !previous || previous.word !== w && w.endsWith(previous.word.endsWith('lijk') ? 'lijk' : 'ig')));
-    const ending = word.endsWith('lijk') ? 'lijk' : 'ig';
-    const stem = word.slice(0,-ending.length);
-    return {kind:'ending', word, prompt:rank===1?'Welk woord is goed gespeld?':'Welk woord hoort op de lege plek?', passage:rank===1?'':sentence,
-      answer:word, options:[word,stem+(ending==='lijk'?'luk':'ug'),stem+(ending==='lijk'?'leik':'ich')],
-      explanation:`De vaste uitgang is -${ending}. Je hoort vaak een korte ‘uh’-klank, maar schrijft ${ending}. Zeg het woord en kijk daarna extra goed naar de laatste letters.`};
-  }
-    const matchingTexts = schoolReading.filter(text => !previous || text.questions.some(item => item[5] === previous.skill));
-  const newTexts = matchingTexts.filter(text => text.passage !== previous?.passage);
-  const text = pick(newTexts.length ? newTexts : matchingTexts);
-  const preferredSkills = rank === 1 ? ['informatie vinden','volgorde','woordbetekenis'] :
-    rank === 3 ? ['hoofdgedachte','afleiden','oorzaak en gevolg','tekstdoel','verwijswoorden'] : [];
-  const matchingQuestions = previous ? text.questions.filter(item => item[5] === previous.skill) :
-    text.questions.filter(item => preferredSkills.includes(item[5]));
-  const [prompt,answer,wrong1,wrong2,explanation,skill] = pick(matchingQuestions.length ? matchingQuestions : text.questions);
-  return {kind:'reading',passage:text.passage,title:text.title,textType:text.type,icon:text.icon,
-    prompt,answer,options:[answer,wrong1,wrong2],explanation,skill};
+  return pick(schoolQuestions(topic,rank,previous));
 }
+
 function math(kind,prompt,answer,explanation,wrong,retry) {
   if(retry) return retry();
   return {kind,prompt,answer:String(answer),options:[answer,...new Set(wrong.filter(n=>n!==answer && n>=0))].map(String),explanation};
@@ -154,6 +182,8 @@ function show(next) {
   if(view==='practice') practice();
   if(view==='choose') chooseMission();
   if(view==='finish') finish();
+  if(view==='island') rewardIsland();
+  if(view==='progress') progressView();
 }
 function timerText(seconds) { return `${Math.floor(seconds/60)}:${String(seconds%60).padStart(2,'0')}`; }
 function goalMarkup() {
@@ -182,6 +212,7 @@ function home() {
       <div><span class="status-icon">${belt[0]}</span><strong>${belt[1]}</strong><span>${nextBelt?`nog ${nextBelt[2]-stars} tot ${nextBelt[1].toLowerCase()}`:'hoogste band'}</span></div>
       <div><span class="status-icon">🌱</span><strong>${Object.values(state.days).reduce((sum,d)=>sum+(d.reflections?.length||0),0)}</strong><span>missies teruggekeken</span></div>
     </section>
+    <section class="island-teaser"><div><p class="label">◈ Bouw je eigen wereld</p><h2>${wallet().balance} bouwmunten</h2><p>Je oefenwerk verandert in decoraties voor jouw eiland.</p><div class="answer-actions"><button class="primary" id="open-island">Mijn bouweiland →</button><button id="open-progress">Bekijk mijn groei</button></div></div><img src="island.webp" alt="Een eigen zwevend bouweiland"></section>
     <section class="adventure-map" aria-label="Avonturenkaart">
       <img src="adventure.webp" alt="Poko wacht bij drie zwevende eilanden met een dojo, een kristalgrot en een sterrentoren.">
       <div class="map-caption"><h2>Jouw volgende avontuur</h2><p>Elke opdracht opent een speelpauze.</p></div>
@@ -191,12 +222,14 @@ function home() {
     <div class="dashboard"><section class="journey"><h2>De eilanden</h2><div class="worlds">${topics.map(t=>`<article class="world"><span class="world-icon" aria-hidden="true">${worlds[t][0]}</span><h3>${worlds[t][1]}</h3><span>${t} · niveau ${level(t)}/3</span><progress class="meter" max="3" value="${level(t)}" aria-label="${t} niveau"></progress></article>`).join('')}</div></section>
     <section class="card daily"><p class="label">🌱 Stap voor stap</p><h2>Jouw dagtraining</h2>${goalMarkup()}</section></div>`;
   document.querySelector('#start').onclick = () => mission ? startMission() : show('choose');
+  screen.querySelector('#open-island').onclick=()=>show('island');
+  screen.querySelector('#open-progress').onclick=()=>show('progress');
 }
 function chooseMission() {
   screen.innerHTML = `<section class="card captain-choice"><p class="label">Leiderschap begint bij jouw keuzes</p><h1>Wat is jouw plan?</h1><p>Een leider denkt na, durft hulp te vragen en leert van een nieuwe poging.</p>
     <div class="captain-options">${captainGoals.map(([icon,title,description],i)=>`<button data-goal="${i}"><span aria-hidden="true">${icon}</span><strong>${title}</strong><small>${description}</small></button>`).join('')}</div></section>`;
   screen.querySelectorAll('[data-goal]').forEach(button => button.onclick = () => {
-    mission = {queue:shuffle(topics),steps:0,stars:0,goal:Number(button.dataset.goal),events:[]};
+    mission = {queue:missionQueue(),steps:0,stars:0,goal:Number(button.dataset.goal),events:[]};
     startMission();
   });
 }
@@ -206,7 +239,7 @@ function startMission() {
     show('practice');
     return;
   }
-  mission ??= { queue: shuffle(topics), steps: 0, stars: 0, goal:0, events:[] };
+  mission ??= { queue: missionQueue(), steps: 0, stars: 0, goal:0, events:[] };
   nextQuestion();
 }
 function finish() {
@@ -214,7 +247,7 @@ function finish() {
   const success = mission.events.filter(event=>event.retry && event.correct).length;
   screen.innerHTML = `<section class="hero finish"><img class="hero-art" src="dojo-world.webp" alt=""><div class="hero-content">
     <p class="label">Missie voltooid · even terugkijken</p><h1>Jij zet stappen.</h1><p>Je oefende met alle drie de vakken. ${success ? `${success} herkansing${success>1?'en':''} gelukt. Je nieuwe poging maakte verschil.` : 'Kies iets wat jou hielp. Zo leer je jouw eigen aanpak kennen.'}</p></div></section>
-    <section class="card reflection"><h2>Wat hielp jou vandaag?</h2><p>Jouw plan was: ${captainGoals[mission.goal][1].toLowerCase()}.</p><div class="reflection-options">
+    <section class="card reflection"><h2>Wat hielp jou vandaag?</h2><p class="reflection-bonus">◈ +10 bouwmunten voor jouw terugblik</p><p>Jouw plan was: ${captainGoals[mission.goal][1].toLowerCase()}.</p><div class="reflection-options">
       ${['Ik las of rekende nog een keer','Ik gebruikte een hint of uitleg','Ik probeerde een andere aanpak','Ik wil dit nog meer oefenen'].map(text=>`<button>${text}</button>`).join('')}</div><p id="reflection-feedback" aria-live="polite"></p>
       <div class="answer-actions"><button class="primary" id="again">Nieuwe missie →</button><button id="rest">Naar mijn dojo</button></div></section>
     <section class="card daily"><h2>Dagtraining</h2>${goalMarkup()}</section>`;
@@ -224,7 +257,7 @@ function finish() {
     reflections.push({goal:completedMission.goal,thought:button.textContent});
     save();
     screen.querySelectorAll('.reflection-options button').forEach(option=>option.disabled=true);
-    screen.querySelector('#reflection-feedback').textContent='Je kent je eigen aanpak nu beter. Kies bij je volgende opdracht één stap die je wilt gebruiken.';
+    screen.querySelector('#reflection-feedback').textContent='+10 bouwmunten verdiend. Je kent je eigen aanpak nu beter. Kies bij je volgende opdracht één stap die je wilt gebruiken.';
   });
   document.querySelector('#again').onclick = () => show('choose');
   document.querySelector('#rest').onclick = () => show('home');
@@ -241,14 +274,10 @@ function nextQuestion() {
   const canRetry = retry && (mission.steps + mission.queue.length < 6);
   const topic = canRetry ? retry.topic : mission.queue.shift();
   const rank = level(topic);
-  let candidate;
-  const recent = state.recent ??= [];
-  for (let attempt=0; attempt<12; attempt++) {
-    candidate = build(topic,rank,canRetry ? retry : null);
-    if (!recent.includes(candidate.prompt + (candidate.passage || '') + candidate.answer)) break;
-  }
-  recent.push(candidate.prompt + (candidate.passage || '') + candidate.answer);
-  state.recent = recent.slice(-30);
+  const candidate=selectQuestion(topic,rank,canRetry?retry:null);
+  const history=state.questionHistory??={};
+  const id=questionIdentity(candidate);
+  history[topic]=[...(history[topic]||[]).filter(value=>value!==id),id].slice(-100);
   question = {...candidate,topic,rank,retry:Boolean(canRetry),help:false};
   save();
   pending = null;
@@ -399,7 +428,7 @@ function grade(button) {
   answered = true;
   const selected = button.querySelector('.choice-text').textContent;
   const correct = selected===question.answer;
-  const event = {topic:question.topic,correct,retry:question.retry,rank:question.rank,skill:question.skill || question.kind,help:question.help};
+  const event = {at:Date.now(),topic:question.topic,correct,retry:question.retry,rank:question.rank,skill:question.skill || question.kind,help:question.help};
   day().events.push(event);
   mission.events.push(event);
   todayEarned();
@@ -418,7 +447,8 @@ function grade(button) {
     question.help ? '💡 Je gebruikte hulp en vond het antwoord. Dat is een slimme keuze.' :
     '⭐ Dat klopt. Kijk naar de uitleg en vergelijk die met jouw aanpak.') :
     `Je koos “${esc(selected)}”. Het juiste antwoord is “${esc(question.answer)}”. ${feedbackFor()}`;
-  screen.querySelector('#feedback').innerHTML = `<strong>${message}</strong><p>${question.explanation}</p>${!correct?'<p class=coach-note>Een fout geeft je een volgende stap. Kies de uitleg of probeer een soortgelijke opdracht.</p>':''}`;
+  const coins=!question.retry?5:correct?2:0;
+  screen.querySelector('#feedback').innerHTML = `<div class="coin-earned">${coins?'+ '+coins+' ◈ bouwmunten':'🌱 Je oefent verder'}</div><strong>${message}</strong><p>${question.explanation}</p>${!correct?'<p class=coach-note>Een fout geeft je een volgende stap. Kies de uitleg of probeer een soortgelijke opdracht.</p>':''}`;
   const next = screen.querySelector('#next');
   next.hidden = false;
   screen.querySelector('#play-game').hidden = false;
