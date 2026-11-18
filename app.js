@@ -1,10 +1,15 @@
 'use strict';
 const topics = ['Rekenen', 'Spelling', 'Begrijpend lezen'];
 const key = 'dojo-level-up-v1';
+const backupKey = 'dojo-level-up-history-v2';
 const defaultTarget = 9;
 const fresh = { target: defaultTarget, name: 'judoka', theme: 'forest', avatar: '🥋', days: {}, paid: {} };
 let state = structuredClone(fresh);
 try { state = { ...state, ...JSON.parse(localStorage.getItem(key) || '{}') }; } catch {}
+try {
+  const snapshot=JSON.parse(localStorage.getItem(backupKey)||'null');
+  if(snapshot)state={...state,...snapshot,days:mergeSavedDays(state.days,snapshot.days)};
+} catch {}
 const worlds = { 'Rekenen': ['🧱', 'Blokkenbouw'], 'Spelling': ['⚡', 'Woordenwerkplaats'], 'Begrijpend lezen': ['🔍', 'Verhalenexpeditie'] };
 let mission = null;
 const captainGoals = [
@@ -22,7 +27,37 @@ const skillStats = () => {
 };
 let view = 'home', question, pending, answered, lastInput = 0, lastTick = Date.now();
 const screen = document.querySelector('#screen');
-const save = () => localStorage.setItem(key, JSON.stringify(state));
+function mergeSavedDays(previous, current) {
+  const merged={...previous,...current};
+  for(const date of Object.keys(merged)){
+    const before=previous[date]||{events:[],seconds:0};
+    const after=current[date]||before;
+    const combine=(oldItems,newItems,type)=>{
+      const entries=new Map();
+      for(const items of [oldItems,newItems]){
+        items.forEach((item,index)=>{
+          const id=item.id??['legacy',date,type,index,JSON.stringify(item)].join('|');
+          entries.set(id,{...item,id});
+        });
+      }
+      return [...entries.values()];
+    };
+    merged[date]={...before,...after,
+      seconds:Math.max(before.seconds,after.seconds),
+      earned:Boolean(before.earned||after.earned),
+      events:combine(before.events,after.events,'attempt'),
+      reflections:combine(before.reflections||[],after.reflections||[],'reflection')};
+  }
+  return merged;
+}
+function save() {
+  const recent=JSON.parse(localStorage.getItem(key)||'{}');
+  const backup=JSON.parse(localStorage.getItem(backupKey)||'{}');
+  state.days=mergeSavedDays(mergeSavedDays(recent.days||{},backup.days||{}),state.days);
+  const serialized=JSON.stringify(state);
+  localStorage.setItem(key,serialized);
+  localStorage.setItem(backupKey,serialized);
+}
 const dateKey = (date = new Date()) => new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Amsterdam' }).format(date);
 const rollout = state.rollout ??= dateKey();
 const day = () => state.days[dateKey()] ??= { seconds: 0, events: [], target: state.target };
@@ -254,7 +289,7 @@ function finish() {
   mission = null;
   screen.querySelectorAll('.reflection-options button').forEach(button=>button.onclick=()=>{
     const reflections = day().reflections ??= [];
-    reflections.push({goal:completedMission.goal,thought:button.textContent});
+    reflections.push({id:crypto.randomUUID(),goal:completedMission.goal,thought:button.textContent});
     save();
     screen.querySelectorAll('.reflection-options button').forEach(option=>option.disabled=true);
     screen.querySelector('#reflection-feedback').textContent='+10 bouwmunten verdiend. Je kent je eigen aanpak nu beter. Kies bij je volgende opdracht één stap die je wilt gebruiken.';
@@ -428,7 +463,7 @@ function grade(button) {
   answered = true;
   const selected = button.querySelector('.choice-text').textContent;
   const correct = selected===question.answer;
-  const event = {at:Date.now(),topic:question.topic,correct,retry:question.retry,rank:question.rank,skill:question.skill || question.kind,help:question.help};
+  const event = {id:crypto.randomUUID(),at:Date.now(),topic:question.topic,correct,retry:question.retry,rank:question.rank,skill:question.skill || question.kind,help:question.help};
   day().events.push(event);
   mission.events.push(event);
   todayEarned();
