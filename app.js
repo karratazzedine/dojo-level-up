@@ -67,7 +67,7 @@ const euro = days => days.filter(earned).length;
 const todayEarned = () => {
   const record = day();
   record.target ??= state.target;
-  if (earned(record)) record.earned = true;
+  if (earned(record) && !record.earned) { record.earned = true; playSound('goal'); }
 };
 for (const [date, record] of Object.entries(state.days)) {
   if (record.target == null && date <= rollout) {
@@ -278,6 +278,7 @@ function startMission() {
   nextQuestion();
 }
 function finish() {
+  playSound('mission');
   const completedMission = mission;
   const success = mission.events.filter(event=>event.retry && event.correct).length;
   screen.innerHTML = `<section class="hero finish"><img class="hero-art" src="dojo-world.webp" alt=""><div class="hero-content">
@@ -314,6 +315,8 @@ function nextQuestion() {
   const id=questionIdentity(candidate);
   history[topic]=[...(history[topic]||[]).filter(value=>value!==id),id].slice(-100);
   question = {...candidate,topic,rank,retry:Boolean(canRetry),help:false};
+  question.readRequired=topic===topics[2]?Math.max(15,Math.min(55,Math.ceil((candidate.passage||'').split(/\s+/).length*.45))):0;
+  question.readRemaining=question.readRequired;
   save();
   pending = null;
   answered = false;
@@ -346,7 +349,8 @@ function practice() {
   <section class="card arena" data-topic="${topics.indexOf(question.topic)}">
     <p class="label">${skillLabel?esc(skillLabel)+' · ':''}${question.retry?'Tweede kans':question.topic} · niveau ${question.rank}</p><h2 tabindex="-1">${question.prompt}</h2>
     ${question.passage?`<blockquote>${question.title?`<span class="text-type">${question.icon} ${question.textType}</span><h3>${question.title}</h3>`:''}${question.passage}</blockquote>`:''}
-    <div class="choices">${shuffle(question.options).map((value,i)=>`<button><span class="choice-key" aria-hidden="true">${'ABCD'[i]}</span><span class="choice-text">${esc(value)}</span></button>`).join('')}</div>
+    ${question.readRemaining>0?`<div class="reading-gate"><p id="read-status" role="status">Lees rustig de tekst. Over ${question.readRemaining} seconden kun je antwoorden.</p><progress id="read-meter" class="meter" max="${question.readRequired}" value="${question.readRequired-question.readRemaining}" aria-label="Leestijd"></progress></div>`:''}
+    <div class="choices" ${question.readRemaining>0?'hidden':''}>${shuffle(question.options).map((value,i)=>`<button ${question.readRemaining>0?'disabled':''}><span class="choice-key" aria-hidden="true">${'ABCD'[i]}</span><span class="choice-text">${esc(value)}</span></button>`).join('')}</div>
     <details class="hint"><summary>💡 Vraag Poko om een hint</summary><p>${hint}</p></details>
     <button class="lesson-button" id="lesson">▶ Uitleg met Poko</button><dialog id="lesson-dialog"></dialog>
     <div class="feedback" id="feedback" aria-live="polite"></div><div class="answer-actions">
@@ -459,10 +463,11 @@ function feedbackFor() {
   return 'Controleer het reken­teken en splits het tweede getal in tientallen en losse eenheden.';
 }
 function grade(button) {
-  if(answered) return;
+  if(answered || question.readRemaining>0) return;
   answered = true;
   const selected = button.querySelector('.choice-text').textContent;
   const correct = selected===question.answer;
+  if(correct)playSound('correct');
   const event = {id:crypto.randomUUID(),at:Date.now(),topic:question.topic,correct,retry:question.retry,rank:question.rank,skill:question.skill || question.kind,help:question.help};
   day().events.push(event);
   mission.events.push(event);
@@ -539,12 +544,33 @@ function settings() {
     save();show('home');
   };
 }
+function advanceReadingTime() {
+  if(!question || answered || question.readRemaining<=0)return;
+  question.readRemaining--;
+  const status=screen.querySelector('#read-status');
+  const meter=screen.querySelector('#read-meter');
+  if(meter)meter.value=question.readRequired-question.readRemaining;
+  if(question.readRemaining===0){
+    screen.querySelector('.choices').hidden=false;
+    screen.querySelectorAll('.choices button').forEach(button=>button.disabled=false);
+    if(status)status.textContent='Je kunt nu antwoorden. Zoek het bewijs in de tekst.';
+  } else if(status)status.textContent=`Lees rustig de tekst. Nog ${question.readRemaining} seconden leestijd.`;
+}
+document.addEventListener('pointerdown',enableSound,{passive:true});
+document.addEventListener('keydown',enableSound);
+document.querySelector('#sound-toggle').onclick=()=>{
+  state.sound=state.sound===false;
+  save();updateSoundButton();enableSound();
+  if(state.sound)playSound('correct');
+};
+updateSoundButton();
 document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>show(b.dataset.view));
 ['keydown','pointerdown','scroll'].forEach(type=>document.addEventListener(type,()=>{if(view==='practice')lastInput=Date.now();},{passive:true}));
 setInterval(()=>{
   const now=Date.now(), elapsed=now-lastTick;
   lastTick=now;
   if(view!=='practice'||document.hidden||document.querySelector('.arena dialog[open]')||now-lastInput>90000||elapsed>2500)return;
+  advanceReadingTime();
   const current=day();
   current.seconds++;
   todayEarned();
