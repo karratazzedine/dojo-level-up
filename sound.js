@@ -13,7 +13,7 @@ function playSound(type) {
   if(state.sound===false)return;
   enableSound();
   if(!dojoAudio||dojoAudio.state!=='running')return;
-  const melodies={correct:[523,659],goal:[523,659,784,1047],build:[392,523],mission:[392,523,659]};
+  const melodies={correct:[523,659],goal:[523,659,784,1047],build:[392,523],mission:[392,523,659],tick:[740],kindness:[440,554,659,880]};
   const melody=melodies[type]||melodies.correct;
   const start=dojoAudio.currentTime;
   melody.forEach((frequency,index)=>{

@@ -11,7 +11,7 @@ function ensureWorld() {
   for (const id of state.owned || []) {
     if (world.legacy.includes(id)) continue;
     const index=decorations.findIndex(item=>item.id===id);
-    if(index<0)continue;
+    if(index<0||index>=6)continue;
     const occupied=new Set(world.pieces.filter(piece=>piece.region==='home').map(piece=>piece.cell));
     const preferred=[8,10,13,21,25,27][index];
     const cell=!occupied.has(preferred)?preferred:Array.from({length:36},(_,i)=>i).find(i=>!occupied.has(i));
@@ -28,7 +28,7 @@ function worldGoal() {
   const all=events();
   const goals=[
     {title:'Veelzijdige ontdekker',target:round*3,value:Math.min(...topics.map(topic=>all.filter(event=>!event.retry&&event.topic===topic).length)),
-      description:`Probeer in elk vak ${round*3} opdrachten. Je leert op drie manieren denken.`},
+      description:`Probeer in elk vak ${round*3} opdrachten. Je oefent verschillende manieren van denken.`},
     {title:'Slimme oplosser',target:round*6,value:all.filter(event=>event.correct).length,
       description:`Beantwoord in totaal ${round*6} vragen goed. Hulp gebruiken mag.`},
     {title:'Leider van je leerplan',target:round*3,value:Object.values(state.days).reduce((sum,record)=>sum+(record.reflections?.length||0),0),
@@ -70,14 +70,14 @@ function renderWorld(message='Kies een bouwstuk en tik op een lege bouwplek. Jij
     <section class="world-toolbar"><label>Wat wil je doen? <select id="build-mode"><option value="build">Bouwen</option><option value="move">Verplaatsen</option><option value="paint">Kleur veranderen</option><option value="store">Opbergen</option></select></label>
     <label>Eilandnaam <input id="region-name" maxlength="28" value="${esc(region.name)}"></label><button id="rename-region">Naam bewaren</button></section>
     <section class="building-palette" aria-label="Bouwstukken">${decorations.map(item=>{
-      const stored=world.pieces.filter(piece=>piece.type===item.id&&piece.cell===null).length;
+      const stored=world.pieces.filter(piece=>piece.type===item.id&&piece.cell===null&&!piece.gifted).length;
       return `<button data-building="${item.id}" aria-pressed="${selectedBuilding===item.id}"><span class="collection-icon sprite-item decor-${item.id}" aria-hidden="true"></span><strong>${item.name}</strong><small>${stored?stored+' op voorraad':item.cost+' ◈ per stuk'}</small></button>`;
     }).join('')}</section>
     <p class="muted">Bouw zoveel stukken als jij wilt. Opbergen bewaart een stuk voor later. Bij verplaatsen tik je eerst op het stuk en daarna op de bestemming.</p>
     <section class="card expansion"><h2>Ontdek je volgende eiland</h2><p>Nieuwe bouwgrond in ${worldBiomes[world.regions.length%worldBiomes.length]}. Elk eiland heeft 36 bouwplekken. Je kunt steeds een volgend eiland ontdekken.</p><button id="expand-world" class="primary" ${account.balance<expansionCost?'disabled':''}>Nieuw eiland · ${expansionCost} ◈</button></section>
     ${worldGoalMarkup()}
     <section class="build-rules"><span>🧩 Opdracht proberen <strong>+5</strong></span><span>🌱 Herkansing gelukt <strong>+2</strong></span><span>🧠 Missie terugkijken <strong>+10</strong></span></section>
-    <p class="muted coin-info">Je hebt ${world.pieces.length} ${world.pieces.length===1?'bouwstuk':'bouwstukken'} en ${world.regions.length} ${world.regions.length===1?'eiland':'eilanden'}. Bouwmunten horen bij dit spel.</p>`;
+    <p class="muted coin-info">Je hebt ${world.pieces.filter(piece=>!piece.gifted).length} ${world.pieces.filter(piece=>!piece.gifted).length===1?'eigen bouwstuk':'eigen bouwstukken'} en ${world.regions.length} ${world.regions.length===1?'eiland':'eilanden'}. Bouwmunten horen bij dit spel.</p>`;
   screen.querySelector('#build-mode').value=buildingMode;
   screen.querySelector('#build-mode').onchange=event=>{buildingMode=event.target.value;movingPiece=null;};
   screen.querySelectorAll('[data-region]').forEach(button=>button.onclick=()=>{
@@ -124,10 +124,12 @@ function editWorldCell(cell) {
     piece.cell=null;
   } else {
     if(piece) {
-      screen.querySelector('#island-message').textContent='Deze plek is al bebouwd. Kies een lege plek of gebruik Verplaatsen.';
+      buildingMode='move';movingPiece=piece.id;
+      screen.querySelector('#build-mode').value='move';
+      screen.querySelector('#island-message').textContent='Stuk opgepakt. Tik op de nieuwe bouwplek om het te verplaatsen.';
       return;
     }
-    const stored=world.pieces.find(item=>item.type===selectedBuilding&&item.cell===null);
+    const stored=world.pieces.find(item=>item.type===selectedBuilding&&item.cell===null&&!item.gifted);
     if(stored){stored.region=world.active;stored.cell=cell;}
     else {
       const price=decorations.find(item=>item.id===selectedBuilding).cost;

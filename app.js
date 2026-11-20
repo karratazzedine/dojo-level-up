@@ -1,5 +1,5 @@
 'use strict';
-const topics = ['Rekenen', 'Spelling', 'Begrijpend lezen'];
+const topics = ['Rekenen', 'Spelling', 'Begrijpend lezen', 'Klokkijken'];
 const key = 'dojo-level-up-v1';
 const backupKey = 'dojo-level-up-history-v2';
 const defaultTarget = 9;
@@ -10,7 +10,7 @@ try {
   const snapshot=JSON.parse(localStorage.getItem(backupKey)||'null');
   if(snapshot)state={...state,...snapshot,days:mergeSavedDays(state.days,snapshot.days)};
 } catch {}
-const worlds = { 'Rekenen': ['🧱', 'Blokkenbouw'], 'Spelling': ['⚡', 'Woordenwerkplaats'], 'Begrijpend lezen': ['🔍', 'Verhalenexpeditie'] };
+const worlds = { 'Rekenen': ['🧱', 'Blokkenbouw'], 'Spelling': ['⚡', 'Woordenwerkplaats'], 'Begrijpend lezen': ['🔍', 'Verhalenexpeditie'], 'Klokkijken':['🕒','Tijdreizigers'] };
 let mission = null;
 const captainGoals = [
   ['🔎', 'Ik controleer mijn antwoord', 'Lees de vraag nog eens en controleer of jouw antwoord erbij past.'],
@@ -100,15 +100,27 @@ function missionQueue() {
   return queue;
 }
 function questionIdentity(item) {
-  return item.word || (item.title ? item.title+'|'+item.prompt : item.prompt);
+  return item.sourceKey || (item.kind==='clock'?'clock|'+item.clockSet+'|'+item.clockTarget:null) || item.word || (item.title ? item.title+'|'+item.prompt : item.prompt);
 }
 function selectQuestion(topic,rank,previous) {
   const history=(state.questionHistory??{})[topic]??[];
-  const pool=topic===topics[0] ?
+  const pool=topic===topics[0] || topic===topics[3] ?
     Array.from({length:32},()=>build(topic,rank,previous)) :
     schoolQuestions(topic,rank,previous);
   const unseen=pool.filter(item=>!history.includes(questionIdentity(item)));
-  if(unseen.length)return pick(unseen);
+  const bankKey=topic+'|'+rank;
+  const exhausted=state.completedBanks??={};
+  if (!exhausted[bankKey] && unseen.length)return pick(unseen);
+  if(topic===topics[1]||topic===topics[2]){
+    exhausted[bankKey]=true;
+    const generator=topic===topics[1]?generatedSpelling:generatedReading;
+    let generated;
+    for(let attempt=0;attempt<25;attempt++){
+      generated=generator(rank,previous);
+      if(!history.includes(questionIdentity(generated)))return generated;
+    }
+    return generated;
+  }
   // When a compatible question set is exhausted, return the least recently seen.
   return pool.reduce((oldest,item)=>history.indexOf(questionIdentity(item))<history.indexOf(questionIdentity(oldest))?item:oldest);
 }
@@ -154,6 +166,7 @@ function schoolQuestions(topic,rank,previous) {
   return different.length?different:bank;
 }
 function build(topic, rank, previous) {
+  if(topic===topics[3])return buildClock(rank,previous);
   if(topic === topics[0]) {
     const a = number(rank === 3 ? 200 : rank * 24, rank === 3 ? 700 : rank * 65), b = number(8,rank * 20);
     const kind = previous?.kind ?? pick(rank === 1 ? ['plus','min','ratio','divide'] : ['plus','min','ratio','divide','money','time','measure', ...(rank===3?['multi']:[])]);
@@ -218,6 +231,7 @@ function show(next) {
   if(view==='choose') chooseMission();
   if(view==='finish') finish();
   if(view==='island') rewardIsland();
+  if(view==='kindness') kindnessView();
   if(view==='progress') progressView();
 }
 function timerText(seconds) { return `${Math.floor(seconds/60)}:${String(seconds%60).padStart(2,'0')}`; }
@@ -254,11 +268,15 @@ function home() {
     </section>
     <section class="growth-section"><h2>Zo groeit jouw denkkracht</h2><div class="growth-grid">${skillStats().map(([icon,label,count,detail])=>`<article><span aria-hidden="true">${icon}</span><h3>${label}</h3><strong>${count}</strong><p>${detail}</p></article>`).join('')}</div>
       <p class="muted">Intelligentie gebruik je als je verbanden legt, een aanpak kiest en controleert wat werkt.</p></section>
-    <div class="dashboard"><section class="journey"><h2>De eilanden</h2><div class="worlds">${topics.map(t=>`<article class="world"><span class="world-icon" aria-hidden="true">${worlds[t][0]}</span><h3>${worlds[t][1]}</h3><span>${t} · niveau ${level(t)}/3</span><progress class="meter" max="3" value="${level(t)}" aria-label="${t} niveau"></progress></article>`).join('')}</div></section>
+    <div class="dashboard"><section class="journey"><h2>De eilanden</h2><div class="worlds">${topics.map(t=>`<article class="world"><span class="world-icon" aria-hidden="true">${worlds[t][0]}</span><h3>${worlds[t][1]}</h3><span>${t} · niveau ${level(t)}/3</span><progress class="meter" max="3" value="${level(t)}" aria-label="${t} niveau"></progress>${t===topics[3]?'<button class="primary" id="start-clock">Oefen met de klok</button>':''}</article>`).join('')}</div></section>
     <section class="card daily"><p class="label">🌱 Stap voor stap</p><h2>Jouw dagtraining</h2>${goalMarkup()}</section></div>`;
   document.querySelector('#start').onclick = () => mission ? startMission() : show('choose');
   screen.querySelector('#open-island').onclick=()=>show('island');
   screen.querySelector('#open-progress').onclick=()=>show('progress');
+  screen.querySelector('#start-clock').onclick=()=>{
+    mission={queue:[topics[3]],total:1,steps:0,stars:0,goal:0,events:[]};
+    pending=null;nextQuestion();
+  };
 }
 function chooseMission() {
   screen.innerHTML = `<section class="card captain-choice"><p class="label">Leiderschap begint bij jouw keuzes</p><h1>Wat is jouw plan?</h1><p>Een leider denkt na, durft hulp te vragen en leert van een nieuwe poging.</p>
@@ -282,7 +300,7 @@ function finish() {
   const completedMission = mission;
   const success = mission.events.filter(event=>event.retry && event.correct).length;
   screen.innerHTML = `<section class="hero finish"><img class="hero-art" src="dojo-world.webp" alt=""><div class="hero-content">
-    <p class="label">Missie voltooid · even terugkijken</p><h1>Jij zet stappen.</h1><p>Je oefende met alle drie de vakken. ${success ? `${success} herkansing${success>1?'en':''} gelukt. Je nieuwe poging maakte verschil.` : 'Kies iets wat jou hielp. Zo leer je jouw eigen aanpak kennen.'}</p></div></section>
+    <p class="label">Missie voltooid · even terugkijken</p><h1>Jij zet stappen.</h1><p>Je hebt je oefenronde afgemaakt. ${success ? `${success} herkansing${success>1?'en':''} gelukt. Je nieuwe poging maakte verschil.` : 'Kies iets wat jou hielp. Zo leer je jouw eigen aanpak kennen.'}</p></div></section>
     <section class="card reflection"><h2>Wat hielp jou vandaag?</h2><p class="reflection-bonus">◈ +10 bouwmunten voor jouw terugblik</p><p>Jouw plan was: ${captainGoals[mission.goal][1].toLowerCase()}.</p><div class="reflection-options">
       ${['Ik las of rekende nog een keer','Ik gebruikte een hint of uitleg','Ik probeerde een andere aanpak','Ik wil dit nog meer oefenen'].map(text=>`<button>${text}</button>`).join('')}</div><p id="reflection-feedback" aria-live="polite"></p>
       <div class="answer-actions"><button class="primary" id="again">Nieuwe missie →</button><button id="rest">Naar mijn dojo</button></div></section>
@@ -301,13 +319,14 @@ function finish() {
   screen.querySelector('h1').focus();
 }
 function nextQuestion() {
+  mission.total??=mission.queue.length;
   const retry = pending;
-  if (!mission.queue.length && (!retry || mission.steps >= 6)) {
+  if (!mission.queue.length && (!retry || mission.steps >= mission.total*2)) {
     pending = null;
     show('finish');
     return;
   }
-  const canRetry = retry && (mission.steps + mission.queue.length < 6);
+  const canRetry = retry && (mission.steps + mission.queue.length < mission.total*2);
   const topic = canRetry ? retry.topic : mission.queue.shift();
   const rank = level(topic);
   const candidate=selectQuestion(topic,rank,canRetry?retry:null);
@@ -328,13 +347,14 @@ function nextQuestion() {
 }
 function practice() {
   const [icon, area] = worlds[question.topic];
-  const step = 3 - mission.queue.length;
+  const step = mission.total - mission.queue.length;
   const skillNames = {dubbel:'Korte klank', open:'Lange klank', verlengen:'Woord langer maken'};
   const skillLabel = skillNames[question.skill] || question.skill;
   const hints = {
     'Rekenen': 'Lees wat er met de blokken of munten gebeurt. Welk rekenteken past daarbij?',
     'Spelling': 'Zeg de woorden zachtjes en kijk extra goed naar de laatste letters.',
-    'Begrijpend lezen': 'Lees de vraag en zoek in het verhaal naar een aanwijzing.'
+    'Begrijpend lezen': 'Lees de vraag en zoek in het verhaal naar een aanwijzing.',
+    'Klokkijken':'Zoek eerst de korte uurwijzer. Tel daarna met de lange wijzer in sprongen van vijf.'
   };
   const mathHints = {
     divide:'Verdeel eerlijk. Welke keersom hoort bij het aantal bakjes en het totaal?',
@@ -345,12 +365,13 @@ function practice() {
     multi:'Reken eerst uit hoeveel blokken je voor alle muren gebruikt. Trek dat van je voorraad af.'
   };
   const hint = mathHints[question.kind] || hints[question.topic];
-  screen.innerHTML = `<p class="mission-intention">${captainGoals[mission.goal][0]} Mijn plan · ${captainGoals[mission.goal][1].toLowerCase()}</p><div class="mission-bar"><span>${icon} ${area}</span><div class="pips" aria-label="Eiland ${step} van 3">${[1,2,3].map(i=>`<span class="${i<step?'done':i===step?'current':''}" aria-hidden="true">${i<step?'✓':i}</span>`).join('')}</div><button id="pause">Pauze</button></div>
+  screen.innerHTML = `<p class="mission-intention">${captainGoals[mission.goal][0]} Mijn plan · ${captainGoals[mission.goal][1].toLowerCase()}</p><div class="mission-bar"><span>${icon} ${area}</span><div class="pips" aria-label="Stap ${step} van ${mission.total}">${Array.from({length:mission.total},(_,i)=>i+1).map(i=>`<span class="${i<step?'done':i===step?'current':''}" aria-hidden="true">${i<step?'✓':i}</span>`).join('')}</div><button id="pause">Pauze</button></div>
   <section class="card arena" data-topic="${topics.indexOf(question.topic)}">
     <p class="label">${skillLabel?esc(skillLabel)+' · ':''}${question.retry?'Tweede kans':question.topic} · niveau ${question.rank}</p><h2 tabindex="-1">${question.prompt}</h2>
     ${question.passage?`<blockquote>${question.title?`<span class="text-type">${question.icon} ${question.textType}</span><h3>${question.title}</h3>`:''}${question.passage}</blockquote>`:''}
+    ${question.kind==='clock'?clockExerciseMarkup():''}
     ${question.readRemaining>0?`<div class="reading-gate"><p id="read-status" role="status">Lees rustig de tekst. Over ${question.readRemaining} seconden kun je antwoorden.</p><progress id="read-meter" class="meter" max="${question.readRequired}" value="${question.readRequired-question.readRemaining}" aria-label="Leestijd"></progress></div>`:''}
-    <div class="choices" ${question.readRemaining>0?'hidden':''}>${shuffle(question.options).map((value,i)=>`<button ${question.readRemaining>0?'disabled':''}><span class="choice-key" aria-hidden="true">${'ABCD'[i]}</span><span class="choice-text">${esc(value)}</span></button>`).join('')}</div>
+    <div class="choices" ${question.readRemaining>0||question.clockSet?'hidden':''}>${shuffle(question.options).map((value,i)=>`<button ${question.readRemaining>0?'disabled':''}><span class="choice-key" aria-hidden="true">${'ABCD'[i]}</span><span class="choice-text">${esc(value)}</span></button>`).join('')}</div>
     <details class="hint"><summary>💡 Vraag Poko om een hint</summary><p>${hint}</p></details>
     <button class="lesson-button" id="lesson">▶ Uitleg met Poko</button><dialog id="lesson-dialog"></dialog>
     <div class="feedback" id="feedback" aria-live="polite"></div><div class="answer-actions">
@@ -361,6 +382,7 @@ function practice() {
   </section>
   <section class="practice-time">${goalMarkup()}</section>`;
   screen.querySelectorAll('.choices button').forEach(b=>b.onclick=()=>grade(b));
+  if(question.kind==='clock')bindClock();
   screen.querySelector('#next').onclick=nextQuestion;
   screen.querySelector('#play-game').onclick=playAdventure;
   screen.querySelector('#pause').onclick=()=>show('home');
@@ -377,6 +399,11 @@ const clips = {
   spelling: ['iQe1vuMTk-0', 'Taaljacht · De uitgangen -ig en -lijk']
 };
 function explain(q) {
+  if(q.kind==='clock')return {icon:'🕒',title:'De klok lezen in drie stappen',steps:[
+    'Zoek de korte oranje wijzer. Die laat zien welk uur al begonnen is.',
+    'De lange blauwe wijzer telt minuten. Elk cijfer verder is een sprong van vijf.',
+    'Bij half vier is het vorige uur drie al begonnen: 3:30. Bij kwart voor vier is het 3:45.'
+  ]};
   if (q.topic === 'Spelling') {
     const rules = {
       verlengen:['Maak het woord langer','Zeg bijvoorbeeld hond → honden.','Luister naar de letter die je nu duidelijk hoort: een d.','Schrijf die letter ook in het korte woord: hond.'],
@@ -455,6 +482,7 @@ function showLesson() {
   modal.showModal();
 }
 function feedbackFor() {
+  if(question.kind==='clock')return 'Bekijk eerst de korte uurwijzer en tel daarna de minuten. Poko’s kloktrucjes helpen je.';
   if(question.topic===topics[1]) return 'Lees de spellingregel en vergelijk de letters in beide woorden.';
   if(question.topic===topics[2]) return 'Je antwoord past minder goed bij de aanwijzingen in de tekst. Zoek welke zin je keuze ondersteunt.';
   if(question.kind==='ratio') return 'Controleer of je gelijke groepjes hebt vermenigvuldigd.';
@@ -462,10 +490,10 @@ function feedbackFor() {
   if (['divide','money','time','measure'].includes(question.kind)) return 'Bekijk het voorbeeld bij Uitleg met Poko en controleer de stappen in jouw som.';
   return 'Controleer het reken­teken en splits het tweede getal in tientallen en losse eenheden.';
 }
-function grade(button) {
+function grade(button, selectedAnswer) {
   if(answered || question.readRemaining>0) return;
   answered = true;
-  const selected = button.querySelector('.choice-text').textContent;
+  const selected = selectedAnswer ?? button.querySelector('.choice-text').textContent;
   const correct = selected===question.answer;
   if(correct)playSound('correct');
   const event = {id:crypto.randomUUID(),at:Date.now(),topic:question.topic,correct,retry:question.retry,rank:question.rank,skill:question.skill || question.kind,help:question.help};
@@ -483,16 +511,20 @@ function grade(button) {
   if (!correct) button.classList.add('chosen-answer');
   screen.querySelector('.hint').hidden = true;
   screen.querySelectorAll('.choices button').forEach(b=>b.disabled=true);
+  screen.querySelectorAll('.clock-controls button').forEach(b=>b.disabled=true);
   const message = correct ? (question.retry ? '🌱 Je nieuwe poging is gelukt. Je gebruikte wat je net leerde.' :
     question.help ? '💡 Je gebruikte hulp en vond het antwoord. Dat is een slimme keuze.' :
     '⭐ Dat klopt. Kijk naar de uitleg en vergelijk die met jouw aanpak.') :
     `Je koos “${esc(selected)}”. Het juiste antwoord is “${esc(question.answer)}”. ${feedbackFor()}`;
   const coins=!question.retry?5:correct?2:0;
   screen.querySelector('#feedback').innerHTML = `<div class="coin-earned">${coins?'+ '+coins+' ◈ bouwmunten':'🌱 Je oefent verder'}</div><strong>${message}</strong><p>${question.explanation}</p>${!correct?'<p class=coach-note>Een fout geeft je een volgende stap. Kies de uitleg of probeer een soortgelijke opdracht.</p>':''}`;
+  if(question.kind==='clock'&&!correct){
+    screen.querySelector('#feedback').innerHTML+=clockFaceMarkup(question.clockTarget,'answer-clock');
+  }
   const next = screen.querySelector('#next');
   next.hidden = false;
   screen.querySelector('#play-game').hidden = false;
-  const canRetry = !correct && mission.steps + mission.queue.length < 6;
+  const canRetry = !correct && mission.steps + mission.queue.length < mission.total*2;
   next.textContent = canRetry ? 'Probeer een soortgelijke vraag →' :
     mission.queue.length ? 'Naar het volgende eiland →' : 'Bekijk je missieresultaat →';
   const feedback = screen.querySelector('#feedback');
@@ -521,9 +553,10 @@ function report() {
   <section class="report-growth"><h2>Zelfvertrouwen door oefenen</h2>
     <p>${all.filter(e=>e.help).length} keer hulp gebruikt · ${retry.filter(e=>e.correct).length} herkansingen gelukt · ${records.reduce((sum,d)=>sum+(d.reflections?.length||0),0)} missies teruggekeken.</p>
     <p>Bespreek samen: “Welke aanpak hielp jou? Wat wil je de volgende keer proberen?”</p></section>
+  <p>Samen goed doen · ${kindnessRecords().filter(record=>dates.includes(record.date)).length} bijdragen deze week. Helpacties zijn door het kind zelf ingevuld.</p>
   <p>Herkansingen goed · ${retry.filter(e=>e.correct).length} / ${retry.length}</p>
   <table><thead><tr><th>Dag</th><th>Oefentijd</th><th>Opdrachten</th><th>Beloning</th></tr></thead><tbody>${records.map((d,i)=>`<tr><td>${['Ma','Di','Wo','Do','Vr','Za','Zo'][i]} ${dates[i].slice(8)}</td><td>${timerText(d.seconds)}</td><td>${completed(d)}${d.target ? ' / '+d.target : ''}</td><td>${earned(d)?'€1':'—'}</td></tr>`).join('')}</tbody></table>
-  <details class="school-notes"><summary>Wat oefent je kind?</summary><p>Nieuwe teksten over school, natuur, techniek, sport en samenwerken. Verhalen, instructies, berichten en informatieve teksten oefenen informatie vinden, volgorde, woordbetekenis, verwijswoorden, oorzaak en gevolg en hoofdgedachte.</p><p>Rekenen oefent optellen, aftrekken, tafels, delen en vanaf niveau 2 geld, digitale tijd en meten. Spelling oefent -ig/-lijk, verlengen en open en gesloten klankgroepen. Dit is aanvullend oefenen voor groep 5. De gebruikte methode en lesweek van school zijn nog onbekend.</p><p>De niveaus volgen de laatste acht eerste pogingen per vak. De aantallen beschrijven oefengedrag. Bespreek groei samen met je kind.</p><p><a href="https://www.slo.nl/thema/meer/tule/nederlands/kerndoel-4/?mode=groepen-56-leerling" target="_blank" rel="noopener">SLO · teksten lezen in groep 5/6</a></p><p>Naam en voortgang staan in deze browser. De site verstuurt het weekrapport niet automatisch.</p></details>
+  <details class="school-notes"><summary>Wat oefent je kind?</summary><p>Nieuwe teksten over school, natuur, techniek, sport en samenwerken. Verhalen, instructies, berichten en informatieve teksten oefenen informatie vinden, volgorde, woordbetekenis, verwijswoorden, oorzaak en gevolg en hoofdgedachte.</p><p>Rekenen oefent optellen, aftrekken, tafels, delen en vanaf niveau 2 geld, digitale tijd en meten. Spelling oefent -ig/-lijk, verlengen en open en gesloten klankgroepen. Klokkijken oefent hele uren, halve uren, kwartieren en vijf minuten. Na de startreeks ontstaan nieuwe oefeningen automatisch uit gecontroleerde tekstsjablonen en bekende spellingregels. Dit is aanvullend oefenen voor groep 5. De gebruikte methode en lesweek van school zijn nog onbekend.</p><p>De niveaus volgen de laatste acht eerste pogingen per vak. De aantallen beschrijven oefengedrag. Bespreek groei samen met je kind.</p><p><a href="https://www.slo.nl/thema/meer/tule/nederlands/kerndoel-4/?mode=groepen-56-leerling" target="_blank" rel="noopener">SLO · teksten lezen in groep 5/6</a></p><p>Naam en voortgang staan in deze browser. De site verstuurt het weekrapport niet automatisch.</p></details>
   <p class="muted">De site houdt het tegoed bij. Thuis regelen jullie de uitbetaling.</p><button id="print">Afdrukken / opslaan als PDF</button></section>`;
   screen.querySelector('#earlier').onclick=()=>{weekOffset--;report();};
   screen.querySelector('#later').onclick=()=>{if(weekOffset<0)weekOffset++;report();};

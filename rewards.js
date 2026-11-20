@@ -5,7 +5,16 @@ const decorations = [
   {id:'gate',icon:'⛩️',name:'Dojo-poort',cost:50,description:'Een eigen ingang voor jouw dojo.'},
   {id:'lantern',icon:'🏮',name:'Lantaarn',cost:70,description:'Warm licht op jouw bouwplek.'},
   {id:'tower',icon:'🏰',name:'Sterrentoren',cost:100,description:'Een toren met jouw gouden ster.'},
-  {id:'dragon',icon:'🐉',name:'Eilanddraak',cost:160,description:'Een vriendelijke bewaker voor je eiland.'}
+  {id:'dragon',icon:'🐉',name:'Eilanddraak',cost:160,description:'Een vriendelijke bewaker voor je eiland.'},
+  {id:'horse',icon:'🐴',name:'Paard',cost:60,description:'Een eigen paard voor je weide.'},
+  {id:'car',icon:'🚗',name:'Rode raceauto',cost:70,description:'Een sportieve auto voor je dorp.'},
+  {id:'house',icon:'🏡',name:'Sprookjeshuis',cost:120,description:'Een huisje met klimop en ronde ramen.'},
+  {id:'pony',icon:'🐎',name:'Pony',cost:80,description:'Een vriendelijke pony met een zadel.'},
+  {id:'jeep',icon:'🚙',name:'Blauwe jeep',cost:110,description:'Een stoere auto voor avonturiers.'},
+  {id:'stable',icon:'🛖',name:'Paardenstal',cost:140,description:'Een warm onderkomen voor je dieren.'},
+  {id:'bench',icon:'🪑',name:'Samenbankje',cost:30,description:'Een plek om samen te zitten.'},
+  {id:'birdhouse',icon:'🐦',name:'Vogelhuisje',cost:25,description:'Een zorgzame plek in je tuin.'},
+  {id:'fountain',icon:'⛲',name:'Hartenfontein',cost:100,description:'Een fontein die je dorp opvrolijkt.'}
 ];
 function wallet() {
   const all = events();
@@ -15,7 +24,8 @@ function wallet() {
     all.filter(event=>event.retry&&event.correct).length*2 + reflections*10 + world.claims.length*30;
   const owned = [...new Set(state.owned || [])].filter(id=>decorations.some(item=>item.id===id));
   const worldSpent=world.regions.reduce((sum,item)=>sum+item.paid,0)+world.pieces.reduce((sum,item)=>sum+item.paid,0);
-  const spent = worldSpent + decorations.filter(item=>owned.includes(item.id)).reduce((sum,item)=>sum+item.cost,0);
+  const given=kindnessRecords().reduce((sum,record)=>sum+(record.amount||0),0);
+  const spent = given + worldSpent + decorations.filter(item=>owned.includes(item.id)).reduce((sum,item)=>sum+item.cost,0);
   return {earned:earnedCoins,spent,balance:earnedCoins-spent,owned};
 }
 function rewardIsland() { renderWorld(); }
@@ -27,9 +37,10 @@ function progressView() {
   const dates=Array.from({length:7},(_,i)=>dateKey(new Date(today.getTime()-(6-i)*86400000)));
   const peak=Math.max(9,...dates.map(date=>completed(state.days[date]||{events:[]})));
   const badgeData=[
-    ['🧭','Ontdekker',topics.every(topic=>all.some(event=>event.topic===topic)),'Oefen alle drie de vakken.'],
+    ['🧭','Ontdekker',topics.slice(0,3).every(topic=>all.some(event=>event.topic===topic)),'Oefen rekenen, spelling en begrijpend lezen.'],
     ['💡','Slimme hulpvrager',all.some(event=>event.help),'Gebruik een hint of uitleg bij een opdracht.'],
     ['🌱','Doorzetter',all.some(event=>event.retry&&event.correct),'Maak een herkansing goed.'],
+    ['🕒','Tijdreiziger',all.some(event=>event.topic==='Klokkijken'&&event.correct),'Lees een klok of zet de wijzers goed.'],
     ['🧠','Eigen leider',Object.values(state.days).some(record=>record.reflections?.length),'Kijk terug op jouw aanpak na een missie.']
   ];
   screen.innerHTML=`<section class="card"><p class="label">Jouw stappen blijven bewaard</p><h1>Mijn groei</h1><p>Je hebt ${first.length} opdrachten geprobeerd op ${trainingDays} ${trainingDays===1?'oefendag':'oefendagen'}.</p>
@@ -49,7 +60,7 @@ function progressView() {
         <small>${earlier.length===8?`De 8 pogingen daarvoor: ${earlier.filter(event=>event.correct).length} goed.`:'Na meer oefenen zie je hier ook de vergelijking met je vorige 8 pogingen.'}</small></div>`;
     }).join('')}<p class="muted">Dit overzicht laat je oefenresultaten zien. Een nieuwe strategie proberen en hulp gebruiken horen ook bij leren.</p></section>
     <section class="growth-section"><h2>Jouw ontdekkingen</h2><div class="badge-grid">${badgeData.map(([icon,name,unlocked,detail])=>`<article class="${unlocked?'unlocked':''}"><span aria-hidden="true">${unlocked?icon:'🔒'}</span><h3>${name}</h3><p>${unlocked?'Behaald · ':''}${detail}</p></article>`).join('')}</div></section>
-    ${worldGoalMarkup()}<section class="card"><h2>Jouw bouwwerk groeit mee</h2><p>${wallet().balance} bouwmunten klaar · ${ensureWorld().pieces.length} bouwstukken verdeeld over ${ensureWorld().regions.length} eilanden.</p><button class="primary" id="see-island">Naar mijn bouweiland →</button></section>`;
+    ${worldGoalMarkup()}<section class="card"><h2>Jouw bouwwerk groeit mee</h2><p>${wallet().balance} bouwmunten klaar · ${ensureWorld().pieces.filter(piece=>!piece.gifted).length} eigen bouwstukken verdeeld over ${ensureWorld().regions.length} eilanden.</p><button class="primary" id="see-island">Naar mijn bouweiland →</button></section>`;
   screen.querySelector('#claim-route').onclick=()=>{if(claimWorldGoal())progressView();};
   screen.querySelector('#see-island').onclick=()=>show('island');
 }
