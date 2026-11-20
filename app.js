@@ -221,6 +221,7 @@ function math(kind,prompt,answer,explanation,wrong,retry) {
   return {kind,prompt,answer:String(answer),options:[answer,...new Set(wrong.filter(n=>n!==answer && n>=0))].map(String),explanation};
 }
 function show(next) {
+  if(!profileIsUnlocked()){profileGate();return;}
   view = next;
   document.body.dataset.theme = state.theme;
   document.querySelectorAll('nav button').forEach(b => b.setAttribute('aria-current',b.dataset.view===view?'page':'false'));
@@ -563,13 +564,14 @@ function report() {
   screen.querySelector('#print').onclick=()=>window.print();
 }
 function settings() {
-  screen.innerHTML=`<section class="card"><h1>Mijn stijl</h1><form><label>Naam <input name="player" maxlength="24" required value="${esc(state.name)}"></label><label>Dojo-kleur <select name="theme"><option value="forest">Limoengroen</option><option value="ocean">IJsblauw</option><option value="ember">Vuuroranje</option></select></label><label>Jouw teken <select name="avatar"><option>🥋</option><option>🧱</option><option>⚡</option><option>🐉</option></select></label><label>Dagdoel opdrachten <input name="target" type="number" min="1" max="60" required value="${state.target}"></label><button class="primary">Bewaar instellingen</button></form><p class="muted">Je stijl en voortgang worden in deze browser bewaard.</p></section>`;
+  screen.innerHTML=`<section class="card"><h1>Mijn stijl</h1><form><label>Naam <input name="player" minlength="2" maxlength="24" required value="${esc(state.name)}"></label><label>Dojo-kleur <select name="theme"><option value="forest">Limoengroen</option><option value="ocean">IJsblauw</option><option value="ember">Vuuroranje</option></select></label><label>Jouw teken <select name="avatar"><option>🥋</option><option>🧱</option><option>⚡</option><option>🐉</option></select></label><label>Dagdoel opdrachten <input name="target" type="number" min="1" max="60" required value="${state.target}"></label><button class="primary">Bewaar instellingen</button></form><p class="muted">Je stijl en voortgang worden in deze browser bewaard.</p></section>`;
   const form=screen.querySelector('form');
   form.elements.theme.value=state.theme; form.elements.avatar.value=state.avatar;
   form.onchange=()=>{ document.body.dataset.theme=form.elements.theme.value; };
   form.onsubmit=event=>{
     event.preventDefault();
     state.name=form.elements.player.value.trim() || 'judoka';
+    renameLocalProfile(state.name);
     state.theme=form.elements.theme.value;state.avatar=form.elements.avatar.value;
     state.target = Number(form.elements.target.value);
     if (!day().earned) day().target = state.target;
@@ -615,4 +617,5 @@ setInterval(()=>{
   const meter=document.querySelector('#meter');
   if(meter)meter.value=current.seconds;
 },1000);
-show('home');
+document.querySelector('#profile-toggle').onclick=lockLocalProfile;
+profileGate();
