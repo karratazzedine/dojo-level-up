@@ -262,7 +262,7 @@ function home() {
       <div><span class="status-icon">${belt[0]}</span><strong>${belt[1]}</strong><span>${nextBelt?`nog ${nextBelt[2]-stars} tot ${nextBelt[1].toLowerCase()}`:'hoogste band'}</span></div>
       <div><span class="status-icon">🌱</span><strong>${Object.values(state.days).reduce((sum,d)=>sum+(d.reflections?.length||0),0)}</strong><span>missies teruggekeken</span></div>
     </section>
-    <section class="island-teaser"><div><p class="label">◈ Bouw je eigen wereld</p><h2>${wallet().balance} bouwmunten</h2><p>Je oefenwerk verandert in decoraties voor jouw eiland.</p><div class="answer-actions"><button class="primary" id="open-island">Mijn bouweiland →</button><button id="open-progress">Bekijk mijn groei</button></div></div><img src="island.webp" alt="Een eigen zwevend bouweiland"></section>
+    <section class="island-teaser"><div><p class="label">◈ Bouw je eigen wereld</p><h2>${wallet().balance} bouwmunten</h2><p>Maak jouw wereld groter, blok voor blok.</p><div class="answer-actions"><button class="primary" id="open-island">Mijn wereld</button><button id="open-progress">Bekijk mijn groei</button></div></div><img src="island.webp" alt="Een eigen zwevend bouweiland"></section>
     <section class="adventure-map" aria-label="Avonturenkaart">
       <img src="adventure.webp" alt="Poko wacht bij drie zwevende eilanden met een dojo, een kristalgrot en een sterrentoren.">
       <div class="map-caption"><h2>Jouw volgende avontuur</h2><p>Elke opdracht opent een speelpauze.</p></div>

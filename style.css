@@ -226,3 +226,26 @@ body[data-locked] header nav,body[data-locked] #sound-toggle,body[data-locked] #
 .profile-error { color:#ffdca0; min-height:1.3em; font-size:.9rem; }.profile-card button[type=submit] { width:100%; margin:4px 0 0; }.profile-link { display:block; background:transparent; border-color:#5c7880; margin-top:14px; }.profile-local { font-size:.8rem; margin:18px 0 0; }
 .recovery-card { max-width:650px; margin:25px auto; }.recovery-card h1 { font-size:clamp(36px,6vw,60px); margin-bottom:18px; }.recovery-code { font:700 clamp(16px,3.5vw,25px)/1.6 ui-monospace,monospace; letter-spacing:.07em; text-align:center; background:#102731; border:2px dashed #bcd478; border-radius:12px; padding:20px 10px; color:#e4ffad; margin:20px 0; overflow-wrap:anywhere; }
 @media(max-width:750px) { .profile-page { grid-template-columns:1fr; }.profile-welcome { min-height:230px; }.profile-welcome>img { object-position:70% 42%; }.profile-welcome>div { padding:60px 20px 18px; max-width:100%; }.profile-welcome h1 { font-size:2.5rem; max-width:8em; }.profile-welcome>div p:not(.label) { max-width:27em; }.profile-card { padding:24px; } }
+
+/* One continuous block world */
+.map-controls { display:flex; flex-wrap:wrap; align-items:center; gap:9px; margin:15px 0; }
+.map-controls>strong { min-width:54px; text-align:center; color:#dfffbc; }.map-controls>span { color:#bfd6df; font-size:.83rem; margin-left:auto; }
+.block-world-viewport { position:relative; height:clamp(410px,65vh,650px); width:100%; overflow:auto; overscroll-behavior:contain; border:1px solid #80b6bb; border-radius:20px; background:radial-gradient(ellipse at 15% 10%,#8abdc366,transparent 45%),radial-gradient(ellipse at 80% 70%,#487d9e88,transparent 50%),linear-gradient(#244e66,#286c79); touch-action:none; user-select:none; -webkit-user-select:none; }
+.block-world-viewport:focus-visible { outline:3px solid var(--accent); outline-offset:3px; }
+#map-size { position:relative; }
+.block-world-scene { position:absolute; transform-origin:0 0; isolation:isolate; }
+.land-cell { position:absolute; width:72px; height:48px; pointer-events:none; }
+.block-voxel { display:block; position:absolute; left:0; width:72px; height:48px; --surface:#83b94b; --left:#5b8037; --right:#436932; pointer-events:none; }
+.block-voxel i,.block-voxel b,.block-voxel em { position:absolute; display:block; inset:0; }
+.block-voxel i { background:linear-gradient(130deg,#ffffff16,transparent 70%),var(--surface); clip-path:polygon(50% 0,100% 37.5%,50% 75%,0 37.5%); }
+.block-voxel b { background:var(--left); clip-path:polygon(0 37.5%,50% 75%,50% 100%,0 62.5%); }
+.block-voxel em { background:var(--right); clip-path:polygon(50% 75%,100% 37.5%,100% 62.5%,50% 100%); }
+.material-stone { --surface:#a5afba; --left:#727f90; --right:#52677a; }.material-brick { --surface:#cc8e65; --left:#a5694c; --right:#89513f; }.material-sand { --surface:#e9d791; --left:#c0a46a; --right:#ab8d55; }.material-water { --surface:#62cde0; --left:#338cae; --right:#1d6d8b; }.material-path { --surface:#aeb0a0; --left:#878c78; --right:#6b7766; }
+.land-hit { pointer-events:auto; position:absolute; left:0; width:72px; height:36px; min-height:0; padding:0; border:0; border-radius:0; clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%); background:transparent; z-index:2; box-shadow:none; touch-action:none; }
+.land-hit:hover,.land-hit:focus-visible { background:#eeffad66; outline:0; }
+.map-piece { pointer-events:auto; width:126px; height:126px; min-height:0; left:50%; padding:0; border:0; border-radius:0; background-color:transparent; z-index:3; filter:drop-shadow(4px 6px 3px #183d4a66); box-shadow:none; touch-action:none; }
+.map-piece:hover,.map-piece:focus-visible { background-color:#e9ffb21f; outline:2px solid #deffb4; outline-offset:-8px; }
+.frontier-tile { position:absolute; width:72px; height:36px; min-height:0; border:0; padding:0; border-radius:0; clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%); background:#b0edf32e; color:#f2ffd3; box-shadow:none; z-index:1000000; touch-action:none; }
+.frontier-tile>span { font-size:19px; font-weight:800; }.frontier-tile:hover,.frontier-tile:focus-visible { background:#e9ffc780; color:#173c44; outline:0; }
+.map-help { font-size:.88rem; margin:16px 0; }.old-neighbourhoods { padding:14px; border:1px solid #62818d; border-radius:12px; margin:18px 0; }.old-neighbourhoods summary { cursor:pointer; font-weight:700; }
+@media(max-width:650px) { .map-controls>span { flex-basis:100%; margin-left:0; }.map-controls button { padding:8px 12px; }.block-world-viewport { height:480px; } }

@@ -23,7 +23,8 @@ function wallet() {
   const earnedCoins = all.filter(event=>!event.retry).length*5 +
     all.filter(event=>event.retry&&event.correct).length*2 + reflections*10 + world.claims.length*30;
   const owned = [...new Set(state.owned || [])].filter(id=>decorations.some(item=>item.id===id));
-  const worldSpent=world.regions.reduce((sum,item)=>sum+item.paid,0)+world.pieces.reduce((sum,item)=>sum+item.paid,0);
+  const terrainSpent=Object.values(world.grid.land).reduce((sum,tile)=>sum+tile.paid,0)+world.grid.blockPurchases.reduce((sum,purchase)=>sum+purchase.paid,0);
+  const worldSpent=terrainSpent + world.regions.reduce((sum,item)=>sum+item.paid,0)+world.pieces.reduce((sum,item)=>sum+item.paid,0);
   const given=kindnessRecords().reduce((sum,record)=>sum+(record.amount||0),0);
   const spent = given + worldSpent + decorations.filter(item=>owned.includes(item.id)).reduce((sum,item)=>sum+item.cost,0);
   return {earned:earnedCoins,spent,balance:earnedCoins-spent,owned};
@@ -60,7 +61,7 @@ function progressView() {
         <small>${earlier.length===8?`De 8 pogingen daarvoor: ${earlier.filter(event=>event.correct).length} goed.`:'Na meer oefenen zie je hier ook de vergelijking met je vorige 8 pogingen.'}</small></div>`;
     }).join('')}<p class="muted">Dit overzicht laat je oefenresultaten zien. Een nieuwe strategie proberen en hulp gebruiken horen ook bij leren.</p></section>
     <section class="growth-section"><h2>Jouw ontdekkingen</h2><div class="badge-grid">${badgeData.map(([icon,name,unlocked,detail])=>`<article class="${unlocked?'unlocked':''}"><span aria-hidden="true">${unlocked?icon:'🔒'}</span><h3>${name}</h3><p>${unlocked?'Behaald · ':''}${detail}</p></article>`).join('')}</div></section>
-    ${worldGoalMarkup()}<section class="card"><h2>Jouw bouwwerk groeit mee</h2><p>${wallet().balance} bouwmunten klaar · ${ensureWorld().pieces.filter(piece=>!piece.gifted).length} eigen bouwstukken verdeeld over ${ensureWorld().regions.length} eilanden.</p><button class="primary" id="see-island">Naar mijn bouweiland →</button></section>`;
+    ${worldGoalMarkup()}<section class="card"><h2>Jouw bouwwerk groeit mee</h2><p>${wallet().balance} bouwmunten klaar · ${ensureWorld().pieces.filter(piece=>!piece.gifted).length} eigen bouwstukken in je wereld van ${Object.keys(ensureWorld().grid.land).length} grondblokjes.</p><button class="primary" id="see-island">Naar mijn wereld</button></section>`;
   screen.querySelector('#claim-route').onclick=()=>{if(claimWorldGoal())progressView();};
   screen.querySelector('#see-island').onclick=()=>show('island');
 }
