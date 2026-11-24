@@ -165,22 +165,28 @@ function schoolQuestions(topic,rank,previous) {
 function build(topic, rank, previous) {
   if(topic===topics[3])return buildClock(rank,previous);
   if(topic === topics[0]) {
-    const a = number(rank === 3 ? 200 : rank * 24, rank === 3 ? 700 : rank * 65), b = number(8,rank * 20);
-    const kind = previous?.kind ?? pick(rank === 1 ? ['plus','min','ratio','divide'] : ['plus','min','ratio','divide','money','time','measure', ...(rank===3?['multi']:[])]);
+    // Deliberate crossings of a ten: addition carries and subtraction borrows.
+    const ranges=rank===1?[4,11,1,7]:rank===2?[12,44,3,12]:[25,74,8,21];
+    const a=number(ranges[0],ranges[1])*10+number(6,9), b=number(ranges[2],ranges[3])*10+number(4,9);
+    const kind = previous?.kind ?? pick(rank === 1 ? ['plus','min','ratio','divide','multi'] : ['plus','min','ratio','divide','money','time','measure','multi','multi', ...(rank===3?['multi']:[])]);
     if(kind === 'ratio') {
-      const per = number(3,rank+6), groups = number(3,rank+7);
+      const per = rank===3?number(12,19):number(3,rank===2?12:9), groups = number(3,9);
+      const tens=Math.floor(per/10)*10,ones=per%10;
       return math(kind, `In elke kist zitten ${per} bouwblokken. Hoeveel blokken zitten in ${groups} kisten?`, per * groups,
-        `Je hebt ${groups} gelijke groepjes van ${per}. Reken ${groups} × ${per}. Weet je het niet uit je hoofd? Tel ${per} steeds erbij.`, [per+groups, per*(groups-1), per*(groups+1)]);
+        per>=10?`Splits ${per} in ${tens} en ${ones}. Eerst ${groups} × ${tens} = ${groups*tens}. Dan ${groups} × ${ones} = ${groups*ones}. Samen ${groups*tens} + ${groups*ones} = ${groups*per}.`:
+        `Je hebt ${groups} gelijke groepjes van ${per}. Reken ${groups} × ${per} = ${groups*per}. Gebruik een keersom die je al kent als startpunt.`, [per+groups, per*(groups-1), per*(groups+1)]);
     }
     if (kind === 'divide') {
-      const groups = number(2,10), per = number(2,10);
+      const groups = number(2,10), per = rank===3?number(11,20):number(rank===2?6:2,rank===2?12:10);
       return math(kind,`Je verdeelt ${groups*per} potloden eerlijk over ${groups} bakjes. Hoeveel potloden komen in elk bakje?`,per,
+        per>10?`Geef elk bakje eerst 10 potloden: dat zijn ${groups} × 10 = ${groups*10}. Er blijven ${groups*(per-10)} potloden over. Dat zijn nog ${per-10} per bakje. Samen 10 + ${per-10} = ${per}. Controleer: ${groups} × ${per} = ${groups*per}.`:
         `Zoek de keersom: ${groups} × hoeveel = ${groups*per}? Het antwoord is ${per}, want ${groups} × ${per} = ${groups*per}.`,[per+1,per-1,groups*per-groups]);
     }
     if (kind === 'money') {
-      const cost = number(12,39), paid = Math.ceil(cost/10)*10+10;
-      return math(kind,`Een boek kost €${cost}. Je betaalt met €${paid}. Hoeveel euro krijg je terug?`,paid-cost,
-        `Reken ${paid} − ${cost}. Of vul aan: van ${cost} naar ${paid}. Je krijgt €${paid-cost} terug.`,[paid-cost+10,cost+paid,paid-cost-1]);
+      const book=number(17,rank===3?69:39),game=rank===1?0:number(12,rank===3?49:29),cost=book+game;
+      const paid=rank===1?Math.ceil(cost/10)*10+10:Math.ceil((cost+1)/50)*50;
+      return math(kind,`Een boek kost €${book}.${game?` Je koopt ook een spel van €${game}.`:''} Je betaalt met €${paid}. Hoeveel euro krijg je terug?`,paid-cost,
+        `${game?`Tel eerst de prijzen op: ${book} + ${game} = ${cost}. `:''}Reken daarna ${paid} − ${cost} = ${paid-cost}. Controleer: ${cost} + ${paid-cost} = ${paid}. Je krijgt €${paid-cost} terug.`,[paid-cost+10,cost+paid,paid-cost-1]);
     }
     if (kind === 'time') {
       const hour = number(9,15), minute = pick([0,15,30]), duration = pick([15,30,45]);
@@ -198,17 +204,18 @@ function build(topic, rank, previous) {
         `1 meter = 100 centimeter. ${meters} meter = ${meters*100} centimeter. Tel daar ${extra} bij op: ${meters*100+extra} centimeter.`,[meters+extra,meters*10+extra,meters*100]);
     }
     if(kind === 'multi') {
-      const blocks = number(3,10), total = blocks*3+number(10,65);
-      return math(kind,`Je hebt ${total} blokken. Je bouwt 3 muren met elk ${blocks} blokken. Hoeveel blokken houd je over?`,total-3*blocks,
-        `Eerst 3 × ${blocks} = ${blocks*3}. Dan ${total} − ${blocks*3} = ${total-3*blocks} blokken over.`,[total-blocks,total+blocks,total-2*blocks]);
+      const walls=number(3,rank===3?8:5),blocks=number(rank===1?4:8,rank===3?19:10),left=number(rank===1?15:35,rank===3?180:75),total=blocks*walls+left;
+      return math(kind,`Je hebt ${total} blokken. Je bouwt ${walls} muren met elk ${blocks} blokken. Hoeveel blokken houd je over?`,left,
+        `Eerst uitrekenen wat je gebruikt: ${blocks>10?`splits ${blocks} in 10 en ${blocks-10}. ${walls} × 10 = ${walls*10} en ${walls} × ${blocks-10} = ${walls*(blocks-10)}. Samen ${blocks*walls}.`:`${walls} × ${blocks} = ${blocks*walls}.`} Trek dat van je voorraad af: ${total} − ${blocks*walls} = ${left} blokken over. Controleer: ${left} + ${blocks*walls} = ${total}.`,[total-blocks,total+blocks,total-(walls-1)*blocks]);
     }
     const plus = kind === 'plus';
-    const prompt = rank === 1 && Math.random() < .5 ? `Hoeveel is ${a} ${plus ? '+' : '−'} ${b}?` : plus ?
+    const prompt = Math.random() < .5 ? `Hoeveel is ${plus?a:a+b} ${plus ? '+' : '−'} ${b}?` : plus ?
       `Je vindt ${a} munten en krijgt er nog ${b}. Hoeveel heb je samen?` :
       `Je hebt ${a+b} munten en geeft er ${b} uit. Hoeveel houd je over?`;
-    const start = !plus && !prompt.startsWith('Hoeveel') ? a+b : a;
+    const start = plus ? a : a+b;
     const sign = plus ? 1 : -1, goal = start + sign*b, tens = b - b%10;
-    return math(kind,prompt,goal,`Begin bij ${start}. ${plus ? 'Tel' : 'Haal'} eerst ${tens} ${plus ? 'erbij' : 'eraf'}. Doe daarna hetzelfde met ${b%10}. Controleer of je uitkomst ${plus ? 'groter' : 'kleiner'} is dan ${start}.`,[start-sign*b,goal+10,goal-1]);
+    const intermediate=start+sign*tens;
+    return math(kind,prompt,goal,`Splits ${b} in ${tens} en ${b%10}. Eerst ${start} ${plus?'+':'−'} ${tens} = ${intermediate}. Dan ${intermediate} ${plus?'+':'−'} ${b%10} = ${goal}. Je gaat hierbij over een tiental. Controleer met de omgekeerde som: ${goal} ${plus?'−':'+'} ${b} = ${start}.`,[start-sign*b,goal+10,goal-1]);
   }
   return pick(schoolQuestions(topic,rank,previous));
 }
@@ -501,7 +508,7 @@ function feedbackFor() {
   if(question.topic===topics[1]) return 'Lees de spellingregel en vergelijk de letters in beide woorden.';
   if(question.topic===topics[2]) return 'Je antwoord past minder goed bij de aanwijzingen in de tekst. Zoek welke zin je keuze ondersteunt.';
   if(question.kind==='ratio') return 'Controleer of je gelijke groepjes hebt vermenigvuldigd.';
-  if(question.kind==='multi') return 'Controleer of je alle drie de muren hebt meegerekend.';
+  if(question.kind==='multi') return 'Controleer of je alle muren hebt meegerekend. Trek daarna het totale aantal gebruikte blokken af.';
   if (['divide','money','time','measure'].includes(question.kind)) return 'Bekijk het voorbeeld bij Uitleg met Poko en controleer de stappen in jouw som.';
   return 'Controleer het reken­teken en splits het tweede getal in tientallen en losse eenheden.';
 }
