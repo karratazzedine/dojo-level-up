@@ -9,6 +9,7 @@ const materials={grass:'Gras',stone:'Steen',brick:'Baksteen',sand:'Zand',water:'
 const worldCamera={zoom:null,focus:null};
 let selectedMaterial='grass';
 let worldResizeObserver=null;
+let worldPresentation='classic';
 
 function tileKey(x,y) { return x+','+y; }
 function legacyChunk(index) {
@@ -107,10 +108,15 @@ function captureWorldCamera() {
   };
 }
 function renderWorld(message='Tik op een plusblokje aan de rand om je wereld groter te maken.') {
+  if(worldPresentation==='classic')return renderClassicWorld(message);
+  return renderBuildMap(message);
+}
+function renderBuildMap(message) {
   captureWorldCamera();
   const world=ensureWorld(),grid=world.grid,account=wallet(),layout=mapLayout(grid);
   const landCount=Object.keys(grid.land).length;
   screen.innerHTML=`<section class="island-heading"><div><p class="label">Bouw verder aan jouw eigen plek</p><h1>${esc(grid.name)}</h1></div><div class="coin-wallet"><strong>${account.balance} ◈</strong><span>bouwmunten</span></div></section>
+    <div class="world-view-actions"><button id="back-classic">Terug naar mijn vertrouwde wereld</button><button id="back-learning">Verder leren</button></div>
     <div class="map-controls" aria-label="Wereld bekijken"><button id="zoom-out" aria-label="Uitzoomen">−</button><strong id="zoom-label">100%</strong><button id="zoom-in" aria-label="Inzoomen">＋</button><button id="zoom-fit">Hele wereld</button><span>Sleep om rond te kijken · twee vingers om te zoomen</span></div>
     <div id="map-viewport" class="block-world-viewport" tabindex="0" aria-label="Jouw uitbreidbare bouwwereld" data-offset-x="${layout.offsetX}" data-offset-y="${layout.offsetY}">
       <div id="map-size"><div id="map-scene" class="block-world-scene" style="width:${layout.width}px;height:${layout.height}px">${worldMapMarkup(world,layout)}</div></div></div>
@@ -129,6 +135,8 @@ function renderWorld(message='Tik op een plusblokje aan de rand om je wereld gro
     ${worldGoalMarkup()}
     <p class="muted coin-info">${landCount} grondblokjes · ${world.pieces.filter(piece=>!piece.gifted).length} eigen bouwstukken · ${grid.looseBlocks.length} losse blokken op voorraad.</p>`;
   screen.querySelector('#build-mode').value=buildingMode;
+  screen.querySelector('#back-classic').onclick=()=>{captureWorldCamera();worldPresentation='classic';renderWorld('Je kijkt weer van dichtbij naar jouw eigen plek.');};
+  screen.querySelector('#back-learning').onclick=()=>show('home');
   screen.querySelector('#build-mode').onchange=event=>{buildingMode=event.target.value;movingPiece=null;};
   screen.querySelector('#ground-material').value=selectedMaterial;
   screen.querySelector('#ground-material').onchange=event=>{selectedMaterial=event.target.value;};
@@ -320,4 +328,51 @@ function bindWorldCamera(world,layout) {
     event.preventDefault();
     setZoom(worldCamera.zoom*Math.exp(-event.deltaY*.01),localPoint(event));
   },{passive:false});
+}
+
+// The original large island is the default view of the same saved world.
+// Every edit uses the shared grid and object records, including additions made on the map.
+function renderClassicWorld(message) {
+  captureWorldCamera();
+  if(worldResizeObserver)worldResizeObserver.disconnect();
+  const world=ensureWorld(),grid=world.grid;
+  const region=world.regions.find(item=>item.id===world.active)||world.regions[0];
+  const origin=grid.origins[region.id];
+  const pieces=new Map(world.pieces.map(piece=>[placedPosition(world,piece),piece]).filter(([position])=>position).map(([position,piece])=>[tileKey(position.x,position.y),piece]));
+  const cells=Array.from({length:36},(_,cell)=>{
+    const row=Math.floor(cell/6),column=cell%6,x=origin.x+column,y=origin.y+row,tile=grid.land[tileKey(x,y)];
+    const piece=pieces.get(tileKey(x,y)),item=decorations.find(item=>item.id===piece?.type);
+    const left=50+(column-row)*6,top=19+(column+row)*4.2;
+    const lift=tile.stack.length*1.1;
+    const surface=tile.stack.at(-1)?.material||tile.material;
+    return `${surface!=='grass'||tile.stack.length?`<span class="classic-ground material-${surface}" style="left:${left}%;top:${top-lift}%" aria-hidden="true"></span>`:''}
+      <button class="plot ${piece?'occupied':''}" data-classic-tile="${x},${y}" style="left:${left}%;top:${top-lift}%" aria-label="Bouwplek ${cell+1}: ${item?.name||'Lege bouwplek'}">${piece?'':tile.stack.length?tile.stack.length+1:'+'}</button>
+      ${piece?`<span class="voxel-decor decor-${piece.type} world-piece variant-${piece.variant||0}" style="left:${left}%;top:${top+3-lift}%" aria-hidden="true"></span>`:''}`;
+  }).join('');
+  const additions=Object.values(grid.land).filter(tile=>!tile.sourceRegion).length;
+  screen.innerHTML=`<section class="island-heading"><div><p class="label">Jouw vertrouwde plek · kijk van dichtbij</p><h1>${esc(grid.name)}</h1></div><div class="coin-wallet"><strong>${wallet().balance} ◈</strong><span>bouwmunten</span></div></section>
+    <div class="world-view-actions"><button class="primary" id="back-learning">Verder leren</button><button id="extend-classic">Verder bouwen · grond erbij</button></div>
+    ${world.regions.length>1?`<nav class="region-tabs" aria-label="Gebieden van dezelfde wereld">${world.regions.map(item=>`<button data-classic-region="${item.id}" aria-pressed="${item.id===region.id}">${esc(item.name)}</button>`).join('')}</nav>`:''}
+    <div class="world-viewport"><div class="world-stage biome-${region.biome}"><img src="island.webp" alt="Jouw grote, vertrouwde eiland met ruimte voor eigen bouwwerken">${cells}</div></div>
+    <p class="island-message" id="island-message" role="status">${esc(message?.startsWith('Tik op een plusblokje')?'Kies een bouwstuk en tik op een lege plek. Wil je meer ruimte? Kies Verder bouwen.':message)}</p>
+    <section class="world-toolbar"><label>Wat wil je doen? <select id="build-mode"><option value="build">Bouwstuk plaatsen</option><option value="move">Bouwstuk verplaatsen</option><option value="paint">Bouwstuk andere kleur</option><option value="store">Bouwstuk opbergen</option><option value="terrain">Grond een kleur geven</option><option value="stack">Blok stapelen · 2 ◈</option><option value="unstack">Bovenste blok opbergen</option></select></label>
+      <label>Soort blok <select id="ground-material">${Object.entries(materials).map(([id,name])=>`<option value="${id}">${name}</option>`).join('')}</select></label><label>Naam van je wereld <input id="world-name" maxlength="28" value="${esc(grid.name)}"></label><button id="rename-world">Naam bewaren</button></section>
+    <section class="building-palette" aria-label="Bouwstukken">${decorations.map(item=>{
+      const stored=world.pieces.filter(piece=>piece.type===item.id&&piece.cell===null&&!piece.gifted).length;
+      return `<button data-building="${item.id}" aria-pressed="${selectedBuilding===item.id}"><span class="collection-icon sprite-item decor-${item.id}" aria-hidden="true"></span><strong>${item.name}</strong><small>${stored?stored+' op voorraad':item.cost+' ◈ per stuk'}</small></button>`;
+    }).join('')}</section>
+    <p class="muted map-help">Je kijkt naar een deel van jouw wereld. ${additions?`Je hebt al ${additions} ${additions===1?'grondblokje':'grondblokjes'} aangebouwd. `:''}Via Verder bouwen zie je ook alle uitbreidingen. Alles hoort bij dezelfde wereld en blijft bewaard.</p>`;
+  screen.querySelector('#back-learning').onclick=()=>show('home');
+  screen.querySelector('#extend-classic').onclick=()=>{
+    worldPresentation='map';worldCamera.zoom=1.2;worldCamera.focus=projectTile(origin.x+2.5,origin.y+2.5);
+    renderWorld('Bouw hier verder aan dezelfde wereld. Tik op een plusblokje aan de rand voor extra grond.');
+  };
+  screen.querySelectorAll('[data-classic-region]').forEach(button=>button.onclick=()=>{world.active=button.dataset.classicRegion;movingPiece=null;save();renderWorld();});
+  screen.querySelector('#build-mode').value=buildingMode;
+  screen.querySelector('#build-mode').onchange=event=>{buildingMode=event.target.value;movingPiece=null;};
+  screen.querySelector('#ground-material').value=selectedMaterial;
+  screen.querySelector('#ground-material').onchange=event=>{selectedMaterial=event.target.value;};
+  screen.querySelector('#rename-world').onclick=()=>{grid.name=screen.querySelector('#world-name').value.trim()||'Mijn wereld';save();renderWorld('Jouw wereld heeft een eigen naam.');};
+  screen.querySelectorAll('[data-classic-tile]').forEach(button=>button.onclick=()=>editWorldTile(...button.dataset.classicTile.split(',').map(Number)));
+  screen.querySelectorAll('[data-building]').forEach(button=>button.onclick=()=>{selectedBuilding=button.dataset.building;buildingMode='build';movingPiece=null;renderWorld('Bouwstuk gekozen. Tik op een lege plek.');});
 }

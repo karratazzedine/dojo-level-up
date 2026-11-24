@@ -89,15 +89,12 @@ const pick = items => shuffle(items)[0];
 const number = (min,max) => Math.floor(Math.random() * (max-min+1)) + min;
 const events = () => Object.keys(state.days).sort().flatMap(d => state.days[d].events);
 const level = topic => {
-  const recent = events().filter(e => e.topic === topic && !e.retry).slice(-8);
+  const recent = events().filter(e => e.topic === topic && !e.retry && e.skill!=='tafels').slice(-8);
   const score = recent.filter(e => e.correct).length;
   return score >= 7 ? 3 : score >= 4 ? 2 : 1;
 };
 function missionQueue() {
-  const queue=shuffle(topics);
-  if (queue.join('|') === state.lastOrder?.join('|')) queue.push(queue.shift());
-  state.lastOrder=[...queue];
-  return queue;
+  return focusedMissionQueue();
 }
 function questionIdentity(item) {
   return item.sourceKey || (item.kind==='clock'?'clock|'+item.clockSet+'|'+item.clockTarget:null) || item.word || (item.title ? item.title+'|'+item.prompt : item.prompt);
@@ -222,6 +219,8 @@ function math(kind,prompt,answer,explanation,wrong,retry) {
 }
 function show(next) {
   if(!profileIsUnlocked()){profileGate();return;}
+  if(view==='practice'&&next!=='practice'&&question&&!answered)question.fluencyInterrupted=true;
+  if(next!=='practice')stopDictation();
   view = next;
   document.body.dataset.theme = state.theme;
   document.querySelectorAll('nav button').forEach(b => b.setAttribute('aria-current',b.dataset.view===view?'page':'false'));
@@ -254,7 +253,7 @@ function home() {
   screen.innerHTML = `<section class="hero">
       <img class="hero-art" src="dojo-world.webp" alt="" fetchpriority="high">
       <div class="hero-content"><p class="label">${esc(state.avatar)} Sensei Poko’s dojo</p><h1>Klaar, ${esc(state.name)}?</h1>
-      <p>Ontdek wat jij al kunt. Kies je plan en groei met Poko mee.</p>
+      <p>Vandaag maak je jouw basis sterker: tafels tot 10, spelling en rekenen. Ook lezen blijft erbij.</p>
       <button class="primary" id="start">${mission?'Ga verder met je missie':'▶ Start je missie'} <span aria-hidden="true">→</span></button></div>
     </section>
     <section class="status-strip" aria-label="Jouw voortgang">
@@ -262,25 +261,29 @@ function home() {
       <div><span class="status-icon">${belt[0]}</span><strong>${belt[1]}</strong><span>${nextBelt?`nog ${nextBelt[2]-stars} tot ${nextBelt[1].toLowerCase()}`:'hoogste band'}</span></div>
       <div><span class="status-icon">🌱</span><strong>${Object.values(state.days).reduce((sum,d)=>sum+(d.reflections?.length||0),0)}</strong><span>missies teruggekeken</span></div>
     </section>
-    <section class="island-teaser"><div><p class="label">◈ Bouw je eigen wereld</p><h2>${wallet().balance} bouwmunten</h2><p>Maak jouw wereld groter, blok voor blok.</p><div class="answer-actions"><button class="primary" id="open-island">Mijn wereld</button><button id="open-progress">Bekijk mijn groei</button></div></div><img src="island.webp" alt="Een eigen zwevend bouweiland"></section>
+    ${tableProgressMarkup()}
+    <section class="card learning-plan"><p class="label">Jouw dagelijkse leerplan</p><h2>Eerst leren, dan verder bouwen</h2><p>Een gemengde ronde: 6 tafelsommen, 3 spellingwoorden, 2 rekenopdrachten en 1 leesopdracht. Je schrijft de spellingwoorden zelf. Daarna kijk je terug op wat jou hielp.</p><button id="daily-plan" class="primary">Start mijn dagtraining</button></section>
     <section class="adventure-map" aria-label="Avonturenkaart">
       <img src="adventure.webp" alt="Poko wacht bij drie zwevende eilanden met een dojo, een kristalgrot en een sterrentoren.">
       <div class="map-caption"><h2>Jouw volgende avontuur</h2><p>Elke opdracht opent een speelpauze.</p></div>
     </section>
     <section class="growth-section"><h2>Zo groeit jouw denkkracht</h2><div class="growth-grid">${skillStats().map(([icon,label,count,detail])=>`<article><span aria-hidden="true">${icon}</span><h3>${label}</h3><strong>${count}</strong><p>${detail}</p></article>`).join('')}</div>
       <p class="muted">Intelligentie gebruik je als je verbanden legt, een aanpak kiest en controleert wat werkt.</p></section>
-    <div class="dashboard"><section class="journey"><h2>De eilanden</h2><div class="worlds">${topics.map(t=>`<article class="world"><span class="world-icon" aria-hidden="true">${worlds[t][0]}</span><h3>${worlds[t][1]}</h3><span>${t} · niveau ${level(t)}/3</span><progress class="meter" max="3" value="${level(t)}" aria-label="${t} niveau"></progress>${t===topics[3]?'<button class="primary" id="start-clock">Oefen met de klok</button>':''}</article>`).join('')}</div></section>
-    <section class="card daily"><p class="label">🌱 Stap voor stap</p><h2>Jouw dagtraining</h2>${goalMarkup()}</section></div>`;
+    <div class="dashboard"><section class="journey"><h2>Jouw vakken</h2><div class="worlds">${topics.map(t=>`<article class="world"><span class="world-icon" aria-hidden="true">${worlds[t][0]}</span><h3>${worlds[t][1]}</h3><span>${t} · niveau ${level(t)}/3</span><progress class="meter" max="3" value="${level(t)}" aria-label="${t} niveau"></progress><button class="subject-start" data-practice-topic="${t}">${t===topics[3]?'Oefen met de klok':'Oefen '+t.toLowerCase()}</button></article>`).join('')}</div></section>
+    <section class="card daily"><p class="label">🌱 Stap voor stap</p><h2>Jouw dagtraining</h2>${goalMarkup()}</section></div>
+    <section class="island-teaser"><div><p class="label">Jouw vertrouwde wereld</p><h2>Even kijken naar wat jij bouwt</h2><p>${wallet().balance} bouwmunten om later mee verder te bouwen.</p><div class="answer-actions"><button id="open-island">Mijn wereld</button><button id="open-progress">Bekijk mijn groei</button></div></div><img src="island.webp" alt="Een eigen zwevend bouweiland"></section>`;
   document.querySelector('#start').onclick = () => mission ? startMission() : show('choose');
   screen.querySelector('#open-island').onclick=()=>show('island');
   screen.querySelector('#open-progress').onclick=()=>show('progress');
-  screen.querySelector('#start-clock').onclick=()=>{
-    mission={queue:[topics[3]],total:1,steps:0,stars:0,goal:0,events:[]};
+  screen.querySelector('#daily-plan').onclick=()=>mission?startMission():show('choose');
+  bindTableTraining();
+  screen.querySelectorAll('[data-practice-topic]').forEach(button=>button.onclick=()=>{
+    mission={queue:Array(button.dataset.practiceTopic===topics[3]?4:6).fill(button.dataset.practiceTopic),steps:0,stars:0,goal:0,events:[]};
     pending=null;nextQuestion();
-  };
+  });
 }
 function chooseMission() {
-  screen.innerHTML = `<section class="card captain-choice"><p class="label">Leiderschap begint bij jouw keuzes</p><h1>Wat is jouw plan?</h1><p>Een leider denkt na, durft hulp te vragen en leert van een nieuwe poging.</p>
+  screen.innerHTML = `<section class="card captain-choice"><p class="label">Leiderschap begint bij jouw keuzes</p><h1>Wat is jouw plan?</h1><p>Vandaag: 6 tafelsommen, 3 spellingwoorden, 2 rekenopdrachten en 1 leesopdracht. Een leider kiest een aanpak en durft hulp te vragen.</p>
     <div class="captain-options">${captainGoals.map(([icon,title,description],i)=>`<button data-goal="${i}"><span aria-hidden="true">${icon}</span><strong>${title}</strong><small>${description}</small></button>`).join('')}</div></section>`;
   screen.querySelectorAll('[data-goal]').forEach(button => button.onclick = () => {
     mission = {queue:missionQueue(),steps:0,stars:0,goal:Number(button.dataset.goal),events:[]};
@@ -328,13 +331,15 @@ function nextQuestion() {
     return;
   }
   const canRetry = retry && (mission.steps + mission.queue.length < mission.total*2);
-  const topic = canRetry ? retry.topic : mission.queue.shift();
+  const task = canRetry ? (retry.kind==='table'?'Tafels':retry.topic) : mission.queue.shift();
+  const topic = task==='Tafels'?topics[0]:task;
   const rank = level(topic);
-  const candidate=selectQuestion(topic,rank,canRetry?retry:null);
+  let candidate=task==='Tafels'?buildTableQuestion(canRetry?retry:null,mission.table):selectQuestion(topic,rank,canRetry?retry:null);
+  if(topic===topics[1])candidate=spellingDictation(candidate);
   const history=state.questionHistory??={};
   const id=questionIdentity(candidate);
   history[topic]=[...(history[topic]||[]).filter(value=>value!==id),id].slice(-100);
-  question = {...candidate,topic,rank,retry:Boolean(canRetry),help:false};
+  question = {...candidate,topic,rank,retry:Boolean(canRetry),help:false,activeMs:0,fluencyInterrupted:false};
   question.readRequired=topic===topics[2]?Math.max(15,Math.min(55,Math.ceil((candidate.passage||'').split(/\s+/).length*.45))):0;
   question.readRemaining=question.readRequired;
   save();
@@ -353,7 +358,7 @@ function practice() {
   const skillLabel = skillNames[question.skill] || question.skill;
   const hints = {
     'Rekenen': 'Lees wat er met de blokken of munten gebeurt. Welk rekenteken past daarbij?',
-    'Spelling': 'Zeg de woorden zachtjes en kijk extra goed naar de laatste letters.',
+    'Spelling': 'Zeg het woord zachtjes. Denk aan de spellingregel: maak het langer, verdeel het in klankgroepen of denk aan de vaste uitgang.',
     'Begrijpend lezen': 'Lees de vraag en zoek in het verhaal naar een aanwijzing.',
     'Klokkijken':'Zoek eerst de korte uurwijzer. Tel daarna met de lange wijzer in sprongen van vijf.'
   };
@@ -365,14 +370,15 @@ function practice() {
     measure:'Zet eerst de meters om in centimeters. 1 meter is 100 centimeter.',
     multi:'Reken eerst uit hoeveel blokken je voor alle muren gebruikt. Trek dat van je voorraad af.'
   };
-  const hint = mathHints[question.kind] || hints[question.topic];
-  screen.innerHTML = `<p class="mission-intention">${captainGoals[mission.goal][0]} Mijn plan · ${captainGoals[mission.goal][1].toLowerCase()}</p><div class="mission-bar"><span>${icon} ${area}</span><div class="pips" aria-label="Stap ${step} van ${mission.total}">${Array.from({length:mission.total},(_,i)=>i+1).map(i=>`<span class="${i<step?'done':i===step?'current':''}" aria-hidden="true">${i<step?'✓':i}</span>`).join('')}</div><button id="pause">Pauze</button></div>
+  const hint = question.kind==='table'?tableStrategy(question.factorA,question.factorB):mathHints[question.kind] || hints[question.topic];
+  screen.innerHTML = `<p class="mission-intention">${captainGoals[mission.goal][0]} Mijn plan · ${captainGoals[mission.goal][1].toLowerCase()}</p><div class="mission-bar"><span>${question.kind==='table'?'🧠 Tafels tot 10':icon+' '+area}</span><span class="mission-step">Stap ${step} van ${mission.total}</span><button id="pause">Pauze</button></div>
   <section class="card arena" data-topic="${topics.indexOf(question.topic)}">
-    <p class="label">${skillLabel?esc(skillLabel)+' · ':''}${question.retry?'Tweede kans':question.topic} · niveau ${question.rank}</p><h2 tabindex="-1">${question.prompt}</h2>
+    <p class="label">${question.kind==='table'?`Tafel van ${question.factorA} · ${question.retry?'Nog een keer proberen':'Uit je hoofd'}`:`${skillLabel?esc(skillLabel)+' · ':''}${question.retry?'Tweede kans':question.topic} · niveau ${question.rank}`}</p><h2 tabindex="-1">${question.prompt}</h2>
     ${question.passage?`<blockquote>${question.title?`<span class="text-type">${question.icon} ${question.textType}</span><h3>${question.title}</h3>`:''}${question.passage}</blockquote>`:''}
     ${question.kind==='clock'?clockExerciseMarkup():''}
     ${question.readRemaining>0?`<div class="reading-gate"><p id="read-status" role="status">Lees rustig de tekst. Over ${question.readRemaining} seconden kun je antwoorden.</p><progress id="read-meter" class="meter" max="${question.readRequired}" value="${question.readRequired-question.readRemaining}" aria-label="Leestijd"></progress></div>`:''}
-    <div class="choices" ${question.readRemaining>0||question.clockSet?'hidden':''}>${shuffle(question.options).map((value,i)=>`<button ${question.readRemaining>0?'disabled':''}><span class="choice-key" aria-hidden="true">${'ABCD'[i]}</span><span class="choice-text">${esc(value)}</span></button>`).join('')}</div>
+    ${question.inputMode?typedAnswerMarkup():''}
+    <div class="choices" ${question.readRemaining>0||question.clockSet||question.inputMode?'hidden':''}>${shuffle(question.options).map((value,i)=>`<button ${question.readRemaining>0?'disabled':''}><span class="choice-key" aria-hidden="true">${'ABCD'[i]}</span><span class="choice-text">${esc(value)}</span></button>`).join('')}</div>
     <details class="hint"><summary>💡 Vraag Poko om een hint</summary><p>${hint}</p></details>
     <button class="lesson-button" id="lesson">▶ Uitleg met Poko</button><dialog id="lesson-dialog"></dialog>
     <div class="feedback" id="feedback" aria-live="polite"></div><div class="answer-actions">
@@ -383,6 +389,7 @@ function practice() {
   </section>
   <section class="practice-time">${goalMarkup()}</section>`;
   screen.querySelectorAll('.choices button').forEach(b=>b.onclick=()=>grade(b));
+  bindTypedAnswer();
   if(question.kind==='clock')bindClock();
   screen.querySelector('#next').onclick=nextQuestion;
   screen.querySelector('#play-game').onclick=playAdventure;
@@ -400,6 +407,11 @@ const clips = {
   spelling: ['iQe1vuMTk-0', 'Taaljacht · De uitgangen -ig en -lijk']
 };
 function explain(q) {
+  if(q.kind==='table')return {icon:'🧠',title:'Een handige som als startpunt',steps:[
+    `${q.factorA} × ${q.factorB} betekent ${q.factorA} gelijke groepjes van ${q.factorB}.`,
+    tableStrategy(q.factorA,q.factorB),
+    'Zeg de hele keersom hardop. Probeer hem straks opnieuw uit je hoofd.'
+  ]};
   if(q.kind==='clock')return {icon:'🕒',title:'De klok lezen in drie stappen',steps:[
     'Zoek de korte oranje wijzer. Die laat zien welk uur al begonnen is.',
     'De lange blauwe wijzer telt minuten. Elk cijfer verder is een sprong van vijf.',
@@ -483,6 +495,8 @@ function showLesson() {
   modal.showModal();
 }
 function feedbackFor() {
+  const specific=specificMistakeFeedback(question.selectedAnswer);
+  if(specific)return esc(specific);
   if(question.kind==='clock')return 'Bekijk eerst de korte uurwijzer en tel daarna de minuten. Poko’s kloktrucjes helpen je.';
   if(question.topic===topics[1]) return 'Lees de spellingregel en vergelijk de letters in beide woorden.';
   if(question.topic===topics[2]) return 'Je antwoord past minder goed bij de aanwijzingen in de tekst. Zoek welke zin je keuze ondersteunt.';
@@ -495,13 +509,17 @@ function grade(button, selectedAnswer) {
   if(answered || question.readRemaining>0) return;
   answered = true;
   const selected = selectedAnswer ?? button.querySelector('.choice-text').textContent;
+  question.selectedAnswer=selected;
   const correct = selected===question.answer;
   if(correct)playSound('correct');
   const event = {id:crypto.randomUUID(),at:Date.now(),topic:question.topic,correct,retry:question.retry,rank:question.rank,skill:question.skill || question.kind,help:question.help};
+  if(question.kind==='table')Object.assign(event,{factKey:question.factKey,factorA:question.factorA,factorB:question.factorB,durationMs:question.activeMs+Math.max(0,Math.min(2500,Date.now()-lastTick)),fluencyEligible:!question.fluencyInterrupted});
+  if(question.inputMode==='spelling')Object.assign(event,{word:question.word,written:selected});
   day().events.push(event);
   mission.events.push(event);
   todayEarned();
   save();
+  screen.querySelectorAll('#typed-answer-form input,#typed-answer-form button').forEach(control=>control.disabled=true);
   document.querySelector('.practice-time').innerHTML = goalMarkup();
   mission.steps++;
   if (correct) mission.stars++;
@@ -516,7 +534,7 @@ function grade(button, selectedAnswer) {
   const message = correct ? (question.retry ? '🌱 Je nieuwe poging is gelukt. Je gebruikte wat je net leerde.' :
     question.help ? '💡 Je gebruikte hulp en vond het antwoord. Dat is een slimme keuze.' :
     '⭐ Dat klopt. Kijk naar de uitleg en vergelijk die met jouw aanpak.') :
-    `Je koos “${esc(selected)}”. Het juiste antwoord is “${esc(question.answer)}”. ${feedbackFor()}`;
+    `Je ${question.inputMode?'schreef':'koos'} “${esc(selected)}”. Het juiste antwoord is “${esc(question.answer)}”. ${feedbackFor()}`;
   const coins=!question.retry?5:correct?2:0;
   screen.querySelector('#feedback').innerHTML = `<div class="coin-earned">${coins?'+ '+coins+' ◈ bouwmunten':'🌱 Je oefent verder'}</div><strong>${message}</strong><p>${question.explanation}</p>${!correct?'<p class=coach-note>Een fout geeft je een volgende stap. Kies de uitleg of probeer een soortgelijke opdracht.</p>':''}`;
   if(question.kind==='clock'&&!correct){
@@ -527,7 +545,7 @@ function grade(button, selectedAnswer) {
   screen.querySelector('#play-game').hidden = false;
   const canRetry = !correct && mission.steps + mission.queue.length < mission.total*2;
   next.textContent = canRetry ? 'Probeer een soortgelijke vraag →' :
-    mission.queue.length ? 'Naar het volgende eiland →' : 'Bekijk je missieresultaat →';
+    mission.queue.length ? 'Volgende opdracht' : 'Bekijk je missieresultaat';
   const feedback = screen.querySelector('#feedback');
   feedback.setAttribute('tabindex','-1');
   feedback.focus();
@@ -547,17 +565,20 @@ function report() {
   const first = all.filter(e=>!e.retry);
   const retry = all.filter(e=>e.retry);
   const weekEarned = euro(records);
+  const tableFirst=first.filter(event=>event.skill==='tafels');
+  const tableRows=tableSummary();
   screen.innerHTML = `<section class="card"><p class="label">Voor jou en thuis</p><h1>Weekrapport</h1><p>${dates[0]} t/m ${dates[6]}</p>
   <button id="earlier" aria-label="Vorige week">← Vorige week</button> <button id="later" ${weekOffset===0?'disabled':''}>Volgende week →</button>
   <div class="grid"><div class="card stat"><strong>${timerText(total)}</strong>min:sec geoefend</div><div class="card stat"><strong>${first.filter(e=>e.correct).length}/${first.length}</strong>in één keer goed</div><div class="card stat"><strong>€${weekEarned}</strong>deze week verdiend</div></div>
   <table><thead><tr><th>Vak</th><th>Eerste poging goed</th></tr></thead><tbody>${topics.map(t=>{const entries=first.filter(e=>e.topic===t);return `<tr><td>${t}</td><td>${entries.filter(e=>e.correct).length} / ${entries.length}</td></tr>`}).join('')}</tbody></table>
+  <section class="report-growth"><h2>Tafels tot en met 10</h2><p>Deze week: ${tableFirst.length} tafelsommen, waarvan ${tableFirst.filter(event=>event.correct).length} in één keer goed. Deze sommen tellen ook mee bij Rekenen.</p><table><thead><tr><th>Tafel</th><th>3× zelfstandig goed</th><th>Op meerdere dagen vlot</th></tr></thead><tbody>${tableRows.map(row=>`<tr><td>${row.table}</td><td>${row.known}/10</td><td>${row.fluent}/10</td></tr>`).join('')}</tbody></table><p class="muted">De tabel toont alle bewaarde oefendagen. “Vlot” betekent hier: de laatste drie eerste pogingen goed, zonder hint of onderbreking, elk binnen zes seconden, op minstens twee dagen. Dit is een oefensignaal, geen schooltoets.</p></section>
   <section class="report-growth"><h2>Zelfvertrouwen door oefenen</h2>
     <p>${all.filter(e=>e.help).length} keer hulp gebruikt · ${retry.filter(e=>e.correct).length} herkansingen gelukt · ${records.reduce((sum,d)=>sum+(d.reflections?.length||0),0)} missies teruggekeken.</p>
     <p>Bespreek samen: “Welke aanpak hielp jou? Wat wil je de volgende keer proberen?”</p></section>
   <p>Samen goed doen · ${kindnessRecords().filter(record=>dates.includes(record.date)).length} bijdragen deze week. Helpacties zijn door het kind zelf ingevuld.</p>
   <p>Herkansingen goed · ${retry.filter(e=>e.correct).length} / ${retry.length}</p>
   <table><thead><tr><th>Dag</th><th>Oefentijd</th><th>Opdrachten</th><th>Beloning</th></tr></thead><tbody>${records.map((d,i)=>`<tr><td>${['Ma','Di','Wo','Do','Vr','Za','Zo'][i]} ${dates[i].slice(8)}</td><td>${timerText(d.seconds)}</td><td>${completed(d)}${d.target ? ' / '+d.target : ''}</td><td>${earned(d)?'€1':'—'}</td></tr>`).join('')}</tbody></table>
-  <details class="school-notes"><summary>Wat oefent je kind?</summary><p>Nieuwe teksten over school, natuur, techniek, sport en samenwerken. Verhalen, instructies, berichten en informatieve teksten oefenen informatie vinden, volgorde, woordbetekenis, verwijswoorden, oorzaak en gevolg en hoofdgedachte.</p><p>Rekenen oefent optellen, aftrekken, tafels, delen en vanaf niveau 2 geld, digitale tijd en meten. Spelling oefent -ig/-lijk, verlengen en open en gesloten klankgroepen. Klokkijken oefent hele uren, halve uren, kwartieren en vijf minuten. Na de startreeks ontstaan nieuwe oefeningen automatisch uit gecontroleerde tekstsjablonen en bekende spellingregels. Dit is aanvullend oefenen voor groep 5. De gebruikte methode en lesweek van school zijn nog onbekend.</p><p>De niveaus volgen de laatste acht eerste pogingen per vak. De aantallen beschrijven oefengedrag. Bespreek groei samen met je kind.</p><p><a href="https://www.slo.nl/thema/meer/tule/nederlands/kerndoel-4/?mode=groepen-56-leerling" target="_blank" rel="noopener">SLO · teksten lezen in groep 5/6</a></p><p>Naam en voortgang staan in deze browser. De site verstuurt het weekrapport niet automatisch.</p></details>
+  <details class="school-notes"><summary>Wat oefent je kind?</summary><p>Het dagelijkse accent ligt op tafels 1 tot en met 10, spelling en rekenen. Een gemengde ronde bevat zes tafelsommen, drie spellingwoorden om zelf te schrijven, twee rekenopdrachten en één leesopdracht. Bij tafels vult het kind het antwoord zelf in. Lastige feiten komen later terug; herhaling over meerdere dagen blijft nodig.</p><p>Spelling oefent -ig/-lijk, verlengen en open en gesloten klankgroepen. De browser kan het woord en de voorbeeldzin voorlezen. Als het kind het woord bekijkt, wordt dat als hulp opgeslagen. Alleen bij begrijpend lezen geldt leestijd vóór het antwoorden. Klokkijken blijft apart beschikbaar.</p><p>De teksten en rekenopdrachten passen bij aanvullend oefenen in groep 5. De gebruikte methode en lesweek van school zijn nog onbekend. De niveaus volgen de laatste acht eerste pogingen per vak; tafelfeiten hebben een eigen voortgang.</p><p>Naam en voortgang staan in deze browser. De site verstuurt het weekrapport niet automatisch.</p></details>
   <p class="muted">De site houdt het tegoed bij. Thuis regelen jullie de uitbetaling.</p><button id="print">Afdrukken / opslaan als PDF</button></section>`;
   screen.querySelector('#earlier').onclick=()=>{weekOffset--;report();};
   screen.querySelector('#later').onclick=()=>{if(weekOffset<0)weekOffset++;report();};
@@ -593,6 +614,7 @@ function advanceReadingTime() {
 }
 document.addEventListener('pointerdown',enableSound,{passive:true});
 document.addEventListener('keydown',enableSound);
+document.addEventListener('visibilitychange',()=>{if(document.hidden&&question&&!answered)question.fluencyInterrupted=true;});
 document.querySelector('#sound-toggle').onclick=()=>{
   state.sound=state.sound===false;
   save();updateSoundButton();enableSound();
@@ -604,7 +626,12 @@ document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>show(b.dataset
 setInterval(()=>{
   const now=Date.now(), elapsed=now-lastTick;
   lastTick=now;
-  if(view!=='practice'||document.hidden||document.querySelector('.arena dialog[open]')||now-lastInput>90000||elapsed>2500)return;
+  const interrupted=document.hidden||document.querySelector('.arena dialog[open]')||now-lastInput>90000||elapsed>2500;
+  if(view==='practice'&&question&&!answered){
+    if(interrupted)question.fluencyInterrupted=true;
+    else question.activeMs+=elapsed;
+  }
+  if(view!=='practice'||interrupted)return;
   advanceReadingTime();
   const current=day();
   current.seconds++;

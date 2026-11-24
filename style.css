@@ -249,3 +249,22 @@ body[data-locked] header nav,body[data-locked] #sound-toggle,body[data-locked] #
 .frontier-tile>span { font-size:19px; font-weight:800; }.frontier-tile:hover,.frontier-tile:focus-visible { background:#e9ffc780; color:#173c44; outline:0; }
 .map-help { font-size:.88rem; margin:16px 0; }.old-neighbourhoods { padding:14px; border:1px solid #62818d; border-radius:12px; margin:18px 0; }.old-neighbourhoods summary { cursor:pointer; font-weight:700; }
 @media(max-width:650px) { .map-controls>span { flex-basis:100%; margin-left:0; }.map-controls button { padding:8px 12px; }.block-world-viewport { height:480px; } }
+
+/* Learning remains the main activity; the familiar full-size world is a reward. */
+.learning-plan,.table-progress { margin:20px 0; }
+.learning-plan { border-color:#8eaa67; background:linear-gradient(120deg,#244538,var(--panel)); }
+.table-progress h2 { font-size:clamp(32px,5vw,48px); }
+.table-grid { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:9px; margin:20px 0; }
+.table-grid button { display:flex; flex-direction:column; align-items:center; padding:12px 8px; background:linear-gradient(145deg,#28525a,#172f40); }
+.table-grid strong { font-size:1.7rem; color:#dfff9e; }.table-grid span,.table-grid small { font-size:.88rem; }.table-grid .meter { height:8px; margin:9px 0; }
+.table-progress>.muted { margin:16px 0 0; font-size:.9rem; }
+.subject-start { display:block; width:100%; margin-top:10px; font-size:.88rem; padding:8px; }
+.mission-step { font-size:.9rem; color:#cde5dd; white-space:nowrap; }
+.typed-answer { padding:20px 0 10px; }.typed-answer label { font-weight:700; margin-bottom:7px; }
+.typed-answer-row { display:flex; gap:10px; }.typed-answer-row input { width:100%; min-width:0; min-height:58px; font-size:1.4rem; background:#102c37; border-color:#94b6ad; }
+.typed-answer-row button { flex-shrink:0; }.dictation-controls { display:flex; flex-wrap:wrap; gap:10px; margin-bottom:12px; }.dictation-controls button { font-size:.95rem; }
+#speech-status,#input-status { font-size:.9rem; color:#d2e5e9; margin:9px 0; }#word-preview { font-size:1.5rem; font-weight:800; color:#e3ffb4; background:#244a40; border-radius:10px; padding:14px; }
+.world-view-actions { display:flex; flex-wrap:wrap; gap:12px; margin:0 0 18px; }
+.classic-ground { position:absolute; transform:translate(-50%,-50%); width:12%; height:6.3%; background:var(--surface,#83b94b); clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%); opacity:.8; pointer-events:none; z-index:1; }
+.world-stage .world-piece { position:absolute; transform:translate(-50%,-100%); }
+@media(max-width:600px){.table-grid { grid-template-columns:repeat(5,minmax(0,1fr)); gap:5px; }.table-grid button { padding:10px 3px; }.table-grid strong { font-size:1.4rem; }.table-grid span,.table-grid small { font-size:.8rem; }.typed-answer-row { flex-wrap:wrap; }.typed-answer-row button { width:100%; }.mission-bar { flex-wrap:wrap; }.world-stage { min-width:0; aspect-ratio:1.25; }.plot { min-width:25px; min-height:25px; font-size:1rem; }}

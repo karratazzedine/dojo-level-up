@@ -29,7 +29,7 @@ function wallet() {
   const spent = given + worldSpent + decorations.filter(item=>owned.includes(item.id)).reduce((sum,item)=>sum+item.cost,0);
   return {earned:earnedCoins,spent,balance:earnedCoins-spent,owned};
 }
-function rewardIsland() { renderWorld(); }
+function rewardIsland() { worldPresentation='classic';renderWorld(); }
 function progressView() {
   const all=events();
   const first=all.filter(event=>!event.retry);
@@ -51,9 +51,10 @@ function progressView() {
       return `<div class="chart-day" aria-label="${date}: ${count} opdrachten en ${timerText(record.seconds)} oefentijd"><strong>${count}</strong><div class="bar-track"><div style="height:${Math.max(2,count/peak*100)}%"></div></div><span>${date.slice(8)}-${date.slice(5,7)}</span></div>`;
     }).join('')}</div>
     <p class="muted">Aantal opdrachten per dag · de afgelopen 7 dagen</p></section>
+    ${tableProgressMarkup()}
     <section class="growth-section"><h2>Jouw aanpak in beeld</h2><div class="growth-grid">${skillStats().map(([icon,label,count,detail])=>`<article><span aria-hidden="true">${icon}</span><h3>${label}</h3><strong>${count}</strong><p>${detail}</p></article>`).join('')}</div></section>
     <section class="card"><h2>Hoe gaat het per vak?</h2>${topics.map(topic=>{
-      const history=first.filter(event=>event.topic===topic);
+      const history=first.filter(event=>event.topic===topic&&event.skill!=='tafels');
       const recent=history.slice(-8);
       const correct=recent.filter(event=>event.correct).length;
       const earlier=history.slice(-16,-8);
@@ -64,4 +65,5 @@ function progressView() {
     ${worldGoalMarkup()}<section class="card"><h2>Jouw bouwwerk groeit mee</h2><p>${wallet().balance} bouwmunten klaar · ${ensureWorld().pieces.filter(piece=>!piece.gifted).length} eigen bouwstukken in je wereld van ${Object.keys(ensureWorld().grid.land).length} grondblokjes.</p><button class="primary" id="see-island">Naar mijn wereld</button></section>`;
   screen.querySelector('#claim-route').onclick=()=>{if(claimWorldGoal())progressView();};
   screen.querySelector('#see-island').onclick=()=>show('island');
+  bindTableTraining();
 }
